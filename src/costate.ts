@@ -2,9 +2,8 @@ import { isFunction, isArray, isObject, merge } from './util'
 
 const IMMUTABLE = Symbol('IMMUTABLE')
 const PARENTS = Symbol('PARENTS')
-const WATCH = Symbol('WATCH')
 
-const internalKeys = [IMMUTABLE, PARENTS, WATCH]
+const internalKeys = [IMMUTABLE, PARENTS]
 
 const isWatchable = input => !!(input && input[IMMUTABLE])
 
@@ -17,23 +16,21 @@ type watchable<T extends object> = {
   [P in keyof T]: T[P]
 }
 
+const Deferred = () => {
+  let resolve, reject
+  let promise = new Promise((a, b) => {
+    resolve = a
+    reject = b
+  })
+  return { resolve, reject, promise }
+}
+
 const watchable = <T extends object>(input: T): watchable<T> => {
   if ((!isObject(input) && !isArray(input)) || isWatchable(input)) {
     return input
   }
 
-  let watcherList = []
-  let watch = watcher => {
-    if (!isFunction(watcher)) {
-      throw new Error(`Expect watcher to be a function, instead of ${watcher}`)
-    }
-    if (watcherList.indexOf(watcher) !== -1) return
-    watcherList.push(watcher)
-    return () => {
-      let index = watcherList.indexOf(watcher)
-      if (index !== -1) watcherList.splice(index, 1)
-    }
-  }
+  let deferred = Deferred()
 
   let target = isArray(input) ? [] : {}
 
@@ -55,21 +52,19 @@ const watchable = <T extends object>(input: T): watchable<T> => {
     }
   }
 
-  let notifyWatcherList = () => {
-    for (let watcher of watcherList) {
-      watcher(immutableTarget)
-    }
-  }
-
   let timer = null
+
   let notify = key => {
     if (internalKeys.indexOf(key) !== -1) return
-    clearTimeout(timer)
-    timer = setTimeout(doNotify)
-  }
-  let doNotify = () => {
-    notifyWatcherList()
     notifyParents()
+    clearTimeout(timer)
+    timer = setTimeout(doNotify, 0)
+  }
+
+  let doNotify = () => {
+    let { resolve } = deferred
+    deferred = Deferred()
+    resolve(immutableTarget)
   }
 
   let handlers: ProxyHandler<T> = {
@@ -81,6 +76,7 @@ const watchable = <T extends object>(input: T): watchable<T> => {
       }
 
       copy()
+
       immutableTarget[key] = getImmutable(value)
       target[key] = value
 
@@ -97,9 +93,12 @@ const watchable = <T extends object>(input: T): watchable<T> => {
       }
 
       copy()
+
       delete immutableTarget[key]
       delete target[key]
+
       notify(key)
+
       return true
     }
   }
@@ -113,8 +112,11 @@ const watchable = <T extends object>(input: T): watchable<T> => {
     [PARENTS]: {
       value: parents
     },
-    [WATCH]: {
-      value: watch
+    [Symbol.asyncIterator]: {
+      value: async function*() {
+        yield immutableTarget
+        while (true) yield await deferred.promise
+      }
     }
   })
 
@@ -123,67 +125,4 @@ const watchable = <T extends object>(input: T): watchable<T> => {
   return proxy
 }
 
-type unwatch = () => void
-type watcher<T extends object> = (value: T) => void
-
-const watch = <T extends object>(watchable: watchable<T>, watcher: watcher<T>): unwatch => {
-  if (!isWatchable(watchable)) {
-    throw new Error(`Expect first argument to be a watchable, instead of ${watchable}`)
-  }
-  return watchable[WATCH](watcher)
-}
-
-type Counter = {
-  count: number
-}
-
-type actions = {
-  [key: string]: Function
-}
-
-const Counter = (count = 0): Counter => {
-  let state = watchable({ count })
-  return state
-}
-
-const CounterList = (
-  initList: Array<{ count: number }> = []
-): [Array<{ count: number }>, { add: (count: number) => void }] => {
-  let list = watchable(initList)
-
-  let add = count => {
-    list.push({ count })
-  }
-
-  return [list, { add }]
-}
-
-let [counterList, actions] = CounterList()
-
-watch(counterList, list => {
-  console.log('list', list)
-})
-
-setInterval(() => {
-  actions.add(Math.random())
-}, 1000)
-
-// let counter = watchable({ count: 0 })
-
-// watch(counter, counter => {
-//   console.log('counter', counter)
-// })
-
-// let state = watchable({
-//   value: counter
-// })
-
-// console.log('state', state)
-
-// watch(state, state => {
-//   console.log('state', state)
-// })
-
-// setInterval(() => {
-//   counter.count += 1
-// }, 1000)
+export default watchable

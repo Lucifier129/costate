@@ -1,14 +1,33 @@
-import DummyClass from "../src/costate"
+import costate from '../src/costate'
 
-/**
- * Dummy test
- */
-describe("Dummy test", () => {
-  it("works if true is truthy", () => {
-    expect(true).toBeTruthy()
-  })
+describe('costate', () => {
+  it('works correctly', done => {
+    let list$ = costate([])
 
-  it("DummyClass is instantiable", () => {
-    expect(new DummyClass()).toBeInstanceOf(DummyClass)
+    let timer
+
+    let comsumer = async () => {
+      let count = 0
+      for await (let list of list$) {
+        count += 1
+        if (count > 10) {
+          clearInterval(timer)
+          expect(list.length).toEqual(10)
+          done()
+          return
+        }
+      }
+    }
+
+    let provider = () => {
+      timer = setInterval(() => {
+        list$.push({ count: { value: Math.random() } })
+        let target = list$[list$.length - 1]
+        delete target.count
+      }, 10)
+    }
+
+    comsumer()
+    provider()
   })
 })
