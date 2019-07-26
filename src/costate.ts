@@ -7,12 +7,17 @@ const WATCH = Symbol('WATCH')
 const internalKeys = [IMMUTABLE, PARENTS, WATCH]
 
 const isWatchable = input => !!(input && input[IMMUTABLE])
+
 const getImmutable = input => {
   if (!isWatchable(input)) return input
   return input[IMMUTABLE]()
 }
 
-const watchable = input => {
+type watchable<T extends object> = {
+  [P in keyof T]: T[P]
+}
+
+const watchable = <T extends object>(input: T): watchable<T> => {
   if ((!isObject(input) && !isArray(input)) || isWatchable(input)) {
     return input
   }
@@ -31,6 +36,7 @@ const watchable = input => {
   }
 
   let target = isArray(input) ? [] : {}
+
   let immutableTarget = isArray(input) ? [] : {}
 
   let parents = new Map()
@@ -55,13 +61,18 @@ const watchable = input => {
     }
   }
 
+  let timer = null
   let notify = key => {
     if (internalKeys.indexOf(key) !== -1) return
+    clearTimeout(timer)
+    timer = setTimeout(doNotify)
+  }
+  let doNotify = () => {
     notifyWatcherList()
     notifyParents()
   }
 
-  let handlers: ProxyHandler<object> = {
+  let handlers: ProxyHandler<T> = {
     set(target, key, value) {
       value = watchable(value)
 
@@ -77,6 +88,7 @@ const watchable = input => {
 
       return true
     },
+
     deleteProperty(target, key) {
       let value = target[key]
 
@@ -92,7 +104,7 @@ const watchable = input => {
     }
   }
 
-  let proxy = new Proxy(target, handlers)
+  let proxy = new Proxy(target, handlers) as watchable<T>
 
   Object.defineProperties(proxy, {
     [IMMUTABLE]: {
@@ -111,29 +123,67 @@ const watchable = input => {
   return proxy
 }
 
-const watch = (watchable, watcher) => {
+type unwatch = () => void
+type watcher<T extends object> = (value: T) => void
+
+const watch = <T extends object>(watchable: watchable<T>, watcher: watcher<T>): unwatch => {
   if (!isWatchable(watchable)) {
     throw new Error(`Expect first argument to be a watchable, instead of ${watchable}`)
   }
   return watchable[WATCH](watcher)
 }
 
-let counter = watchable({ count: 0 })
+type Counter = {
+  count: number
+}
 
-watch(counter, counter => {
-  console.log('counter', counter)
-})
+type actions = {
+  [key: string]: Function
+}
 
-let state = watchable({
-  value: counter
-})
+const Counter = (count = 0): Counter => {
+  let state = watchable({ count })
+  return state
+}
 
-console.log('state', state)
+const CounterList = (
+  initList: Array<{ count: number }> = []
+): [Array<{ count: number }>, { add: (count: number) => void }] => {
+  let list = watchable(initList)
 
-watch(state, state => {
-  console.log('state', state)
+  let add = count => {
+    list.push({ count })
+  }
+
+  return [list, { add }]
+}
+
+let [counterList, actions] = CounterList()
+
+watch(counterList, list => {
+  console.log('list', list)
 })
 
 setInterval(() => {
-  counter.count += 1
+  actions.add(Math.random())
 }, 1000)
+
+// let counter = watchable({ count: 0 })
+
+// watch(counter, counter => {
+//   console.log('counter', counter)
+// })
+
+// let state = watchable({
+//   value: counter
+// })
+
+// console.log('state', state)
+
+// watch(state, state => {
+//   console.log('state', state)
+// })
+
+// setInterval(() => {
+//   counter.count += 1
+// }, 1000)
