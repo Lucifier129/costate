@@ -1,48 +1,39 @@
-import { isFunction, isArray, isObject, merge } from './util'
+import { isArray, isObject, merge, createDeferred } from './util'
 
 const IMMUTABLE = Symbol('IMMUTABLE')
 const PARENTS = Symbol('PARENTS')
 
 const internalKeys = [IMMUTABLE, PARENTS]
 
-const isWatchable = input => !!(input && input[IMMUTABLE])
+const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
-const getImmutable = input => {
-  if (!isWatchable(input)) return input
+export const read = (input: any): any => {
+  if (!isCostate(input)) return input
   return input[IMMUTABLE]()
 }
 
-type watchable<T extends object> = {
-  [P in keyof T]: T[P]
-}
+export type Costate<T> = T & AsyncIterableIterator<T>
 
-const Deferred = () => {
-  let resolve, reject
-  let promise = new Promise((a, b) => {
-    resolve = a
-    reject = b
-  })
-  return { resolve, reject, promise }
-}
-
-const watchable = <T extends object>(input: T): watchable<T> => {
-  if ((!isObject(input) && !isArray(input)) || isWatchable(input)) {
-    return input
+const co = <T extends object>(state: T): Costate<T> => {
+  if (!isObject(state) && !isArray(state)) {
+    throw new Error(`Expect state to be array or object, instead of ${state}`)
   }
 
-  let deferred = Deferred()
+  if (isCostate(state)) return state as Costate<T>
 
-  let target = isArray(input) ? [] : {}
+  let deferred = createDeferred<T>()
 
-  let immutableTarget = isArray(input) ? [] : {}
+  let target = (isArray(state) ? [] : {}) as T
+
+  let immutableTarget = (isArray(state) ? [] : {}) as T
 
   let parents = new Map()
 
   let copy = () => {
     if (isArray(immutableTarget)) {
-      immutableTarget = [...immutableTarget]
+      immutableTarget = [...immutableTarget] as T
     } else {
-      immutableTarget = { ...immutableTarget }
+      immutableTarget = { ...immutableTarget } as T
     }
   }
 
@@ -52,32 +43,37 @@ const watchable = <T extends object>(input: T): watchable<T> => {
     }
   }
 
-  let timer = null
+  let timer: NodeJS.Timeout | null = null
 
-  let notify = key => {
-    if (internalKeys.indexOf(key) !== -1) return
+  let notify = (key: string | number | symbol) => {
+    if (typeof key === 'symbol') {
+      if (internalKeys.indexOf(key) !== -1) return
+    }
+
     notifyParents()
-    clearTimeout(timer)
+    if (timer != null) clearTimeout(timer)
     timer = setTimeout(doNotify, 0)
   }
 
   let doNotify = () => {
-    let { resolve } = deferred
-    deferred = Deferred()
-    resolve(immutableTarget)
+    deferred.resolve(immutableTarget)
+    deferred = createDeferred<T>()
   }
 
   let handlers: ProxyHandler<T> = {
     set(target, key, value) {
-      value = watchable(value)
+      if (isObject(value) || isArray(value)) {
+        value = co(value)
+      }
 
-      if (isWatchable(value)) {
+      if (isCostate(value)) {
         value[PARENTS].set(proxy, key)
       }
 
+      // copy before assigning
       copy()
 
-      immutableTarget[key] = getImmutable(value)
+      immutableTarget[key] = read(value)
       target[key] = value
 
       notify(key)
@@ -88,10 +84,11 @@ const watchable = <T extends object>(input: T): watchable<T> => {
     deleteProperty(target, key) {
       let value = target[key]
 
-      if (isWatchable(value)) {
+      if (isCostate(value)) {
         value[PARENTS].delete(proxy)
       }
 
+      // copy before deleting
       copy()
 
       delete immutableTarget[key]
@@ -103,7 +100,7 @@ const watchable = <T extends object>(input: T): watchable<T> => {
     }
   }
 
-  let proxy = new Proxy(target, handlers) as watchable<T>
+  let proxy = new Proxy(target, handlers)
 
   Object.defineProperties(proxy, {
     [IMMUTABLE]: {
@@ -114,15 +111,14 @@ const watchable = <T extends object>(input: T): watchable<T> => {
     },
     [Symbol.asyncIterator]: {
       value: async function*() {
-        yield immutableTarget
         while (true) yield await deferred.promise
       }
     }
   })
 
-  merge(proxy, input)
+  merge(proxy, state)
 
-  return proxy
+  return proxy as Costate<T>
 }
 
-export default watchable
+export default co

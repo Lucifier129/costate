@@ -1,16 +1,19 @@
-import costate from '../src/costate'
+import co from '../src'
 
 describe('costate', () => {
   it('works correctly', done => {
-    let list$ = costate([])
+    type item = {
+      count: { value: number }
+    }
+    let colist = co([] as item[])
 
     let timer
 
     let comsumer = async () => {
       let count = 0
-      for await (let list of list$) {
+      for await (let list of colist) {
         count += 1
-        if (count > 10) {
+        if (count >= 10) {
           clearInterval(timer)
           expect(list.length).toEqual(10)
           done()
@@ -21,8 +24,8 @@ describe('costate', () => {
 
     let provider = () => {
       timer = setInterval(() => {
-        list$.push({ count: { value: Math.random() } })
-        let target = list$[list$.length - 1]
+        colist.push({ count: { value: Math.random() } })
+        let target = colist[colist.length - 1]
         delete target.count
       }, 10)
     }
