@@ -1,5 +1,5 @@
 import 'jest'
-import { Costate } from '../src/costate'
+import { Costate, isCostate, read } from '../src/costate'
 import useCoreducer, { Coreducer, CoreducerState, CoreducerAction } from '../src/useCoreducer'
 import React from 'react'
 import ReactDOM from 'react-dom'
@@ -35,24 +35,27 @@ describe('useCoreducer', () => {
 
   it('works corrently', async () => {
     let Test = () => {
-      let coreducer: Coreducer<{ count: number }, { type: string }> = (costate, action) => {
-        switch (action.type) {
-          case 'incre': {
-            costate.count += 1
-            break
+      let [state, dispatch] = useCoreducer<Coreducer<{ count: number }, { type: string }>>(
+        (costate, action) => {
+          switch (action.type) {
+            case 'incre': {
+              costate.count += 1
+              break
+            }
+            case 'decre': {
+              costate.count -= 1
+              break
+            }
           }
-          case 'decre': {
-            costate.count -= 1
-          }
+        },
+        {
+          count: 0
         }
-      }
-      let [state, dispatch] = useCoreducer(coreducer, {
-        count: 0
-      })
+      )
 
       let handleClick = () => {
         dispatch({
-          type: 'incre'
+          type: 'decre'
         })
       }
 
@@ -73,7 +76,7 @@ describe('useCoreducer', () => {
 
     await delay()
 
-    expect(button.textContent).toBe('1')
+    expect(button.textContent).toBe('-1')
 
     act(() => {
       button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -81,6 +84,6 @@ describe('useCoreducer', () => {
 
     await delay()
 
-    expect(button.textContent).toBe('2')
+    expect(button.textContent).toBe('-2')
   })
 })

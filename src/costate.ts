@@ -5,9 +5,9 @@ const PARENTS = Symbol('PARENTS')
 
 const internalKeys = [IMMUTABLE, PARENTS]
 
-const isCostate = (input: any) => !!(input && input[IMMUTABLE])
+export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
-export const read = (input: any): any => {
+export const read = <T>(input: Costate<T> | T): T => {
   if (!isCostate(input)) return input
   return input[IMMUTABLE]()
 }

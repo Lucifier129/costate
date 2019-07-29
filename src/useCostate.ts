@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import co, { Costate } from './costate'
 
 export default function useCostate<T extends object = any>(initialState: T): [T, Costate<T>] {
-  let costate = useMemo<Costate<T>>(() => co(initialState), [])
+  let costate = useMemo(() => co(initialState), [])
   let [state, setState] = useState<T>(initialState)
 
   useEffect(() => {
