@@ -1,6 +1,5 @@
 import 'jest'
-import { Costate, isCostate, read } from '../src/costate'
-import useCoreducer, { Coreducer, CoreducerState, CoreducerAction } from '../src/useCoreducer'
+import useCoreducer from '../src/useCoreducer'
 import React from 'react'
 import ReactDOM from 'react-dom'
 import { act } from 'react-dom/test-utils'
@@ -35,7 +34,7 @@ describe('useCoreducer', () => {
 
   it('works corrently', async () => {
     let Test = () => {
-      let [state, dispatch] = useCoreducer<Coreducer<{ count: number }, { type: string }>>(
+      let [state, dispatch] = useCoreducer<{ count: number }, { type: string }>(
         (costate, action) => {
           switch (action.type) {
             case 'incre': {
