@@ -15,7 +15,10 @@ export const read = <T>(input: Costate<T> | T): T => {
 
 export type Costate<T> = T & AsyncIterableIterator<T>
 
-const co = <T extends object>(state: T): Costate<T> => {
+type Key = string | number | symbol
+type Keys = Key[]
+
+const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   if (!isObject(state) && !isArray(state)) {
     throw new Error(`Expect state to be array or object, instead of ${state}`)
   }
@@ -26,23 +29,29 @@ const co = <T extends object>(state: T): Costate<T> => {
 
   let isArrayType = isArray(state)
 
-  let target = (isArrayType ? [] : {}) as T
+  let target = isArrayType ? [] : {}
 
-  let immutableTarget = (isArrayType ? [] : {}) as T
+  let immutableTarget = isArrayType ? [] : {}
 
   let parents = new Map()
 
   let copy = () => {
     if (isArray(immutableTarget)) {
-      immutableTarget = [...immutableTarget] as T
+      immutableTarget = [...immutableTarget]
     } else {
       immutableTarget = { ...immutableTarget }
     }
   }
 
   let notifyParents = () => {
-    for (let [parent, key] of parents) {
-      parent[key] = proxy
+    for (let [parent, keys] of parents) {
+      if (!isArray(keys)) {
+        parent[keys] = proxy
+        continue
+      }
+      for (let key of keys) {
+        parent[key] = proxy
+      }
     }
   }
 
@@ -59,8 +68,41 @@ const co = <T extends object>(state: T): Costate<T> => {
   }
 
   let doNotify = () => {
-    deferred.resolve(immutableTarget)
+    deferred.resolve(immutableTarget as T)
     deferred = createDeferred<T>()
+  }
+
+  let connectChild = (child, key) => {
+    let parents = child[PARENTS] as Map<Costate<any>, Key | Keys>
+
+    if (!parents.has(proxy)) {
+      parents.set(proxy, key)
+      return
+    }
+
+    let keys = parents.get(proxy)
+    if (!isArray(keys)) {
+      keys = [keys]
+    }
+    if (!keys.includes(key)) {
+      keys.push(key)
+    }
+  }
+
+  let disconnectChild = (child, key) => {
+    let parents = child[PARENTS] as Map<Costate<any>, Key | Keys>
+
+    if (!parents.has(proxy)) {
+      throw new Error(`${key} is not connected, can't be delete`)
+    }
+
+    let keys = parents.get(proxy)
+    if (!isArray(keys) || keys.length === 1) {
+      parents.delete(proxy)
+    } else {
+      let index = keys.findIndex(key)
+      keys.splice(index, 1)
+    }
   }
 
   let handlers: ProxyHandler<T> = {
@@ -77,7 +119,7 @@ const co = <T extends object>(state: T): Costate<T> => {
       }
 
       if (isCostate(value)) {
-        value[PARENTS].set(proxy, key)
+        connectChild(value, key)
       }
 
       // copy before assigning
@@ -86,9 +128,9 @@ const co = <T extends object>(state: T): Costate<T> => {
       immutableTarget[key] = read(value)
       target[key] = value
 
-      // delete proxy from prevValue[PARENT], they are not connected now
+      // disonnnect prev child
       if (isCostate(prevValue) && value !== prevValue) {
-        prevValue[PARENTS].delete(proxy)
+        disconnectChild(prevValue, key)
       }
 
       notify(key)
@@ -100,6 +142,7 @@ const co = <T extends object>(state: T): Costate<T> => {
       let value = target[key]
 
       if (isCostate(value)) {
+        disconnectChild(value, key)
         value[PARENTS].delete(proxy)
       }
 
