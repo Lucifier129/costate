@@ -24,9 +24,11 @@ const co = <T extends object>(state: T): Costate<T> => {
 
   let deferred = createDeferred<T>()
 
-  let target = (isArray(state) ? [] : {}) as T
+  let isArrayType = isArray(state)
 
-  let immutableTarget = (isArray(state) ? [] : {}) as T
+  let target = (isArrayType ? [] : {}) as T
+
+  let immutableTarget = (isArrayType ? [] : {}) as T
 
   let parents = new Map()
 
@@ -63,6 +65,13 @@ const co = <T extends object>(state: T): Costate<T> => {
 
   let handlers: ProxyHandler<T> = {
     set(target, key, value) {
+      // list.push will trigger both index-key and length-key, ignore it
+      if (isArrayType && key === 'length' && value === (target as Array<any>).length) {
+        return true
+      }
+
+      let prevValue = target[key]
+
       if (isObject(value) || isArray(value)) {
         value = co(value)
       }
@@ -76,6 +85,11 @@ const co = <T extends object>(state: T): Costate<T> => {
 
       immutableTarget[key] = read(value)
       target[key] = value
+
+      // delete proxy from prevValue[PARENT], they are not connected now
+      if (isCostate(prevValue) && value !== prevValue) {
+        prevValue[PARENTS].delete(proxy)
+      }
 
       notify(key)
 
