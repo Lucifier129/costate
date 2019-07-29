@@ -33,7 +33,7 @@ const co = <T extends object>(state: T): Costate<T> => {
     if (isArray(immutableTarget)) {
       immutableTarget = [...immutableTarget] as T
     } else {
-      immutableTarget = { ...immutableTarget } as T
+      immutableTarget = { ...immutableTarget }
     }
   }
 

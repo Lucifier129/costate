@@ -1,4 +1,5 @@
-import co from '../src'
+import 'jest'
+import co, { Costate } from '../src'
 
 describe('costate', () => {
   it('works correctly', done => {
@@ -30,6 +31,7 @@ describe('costate', () => {
       }, 10)
     }
 
+    // tslint:disable-next-line: no-floating-promises
     comsumer()
     provider()
   })

@@ -2,11 +2,13 @@
   "name": "costate",
   "version": "0.0.1",
   "description": "A state management library inspired by vue and immer",
-  "main": "index.js",
-  "module": "index.js",
+  "main": "dist/costate.umd.js",
+  "module": "dist/costate.es.js",
   "typings": "dist/types/costate.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "react",
+    "index.js"
   ],
   "repository": {
     "type": "git",

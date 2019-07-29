@@ -1,3 +1,4 @@
+import 'jest'
 import useCostate from '../src/useCostate'
 import React from 'react'
 import ReactDOM from 'react-dom'
@@ -33,14 +34,13 @@ describe('useCostate', () => {
 
   it('works corrently', async () => {
     let Test = () => {
-      let [data, codata] = useCostate({ count: 0 })
+      let [state, costate] = useCostate({ count: 0 })
 
       let handleClick = () => {
-        console.log('codata', codata)
-        codata.count += 1
+        costate.count += 1
       }
 
-      return <button onClick={handleClick}>{data.count}</button>
+      return <button onClick={handleClick}>{state.count}</button>
     }
 
     act(() => {

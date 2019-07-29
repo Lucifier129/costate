@@ -24,7 +24,7 @@ export const merge = <T = any>(target: object | Array<T>, source: object | Array
   return target
 }
 
-interface deferred<T = any> {
+interface Deferred<T = any> {
   promise: Promise<T>
   resolve: (value?: T) => void
   reject: (reason?: any) => void
@@ -32,9 +32,9 @@ interface deferred<T = any> {
 
 const noop = () => {}
 
-export const createDeferred = <T>(): deferred<T> => {
-  let resolve: deferred<T>['resolve'] = noop
-  let reject: deferred<T>['reject'] = noop
+export const createDeferred = <T>(): Deferred<T> => {
+  let resolve: Deferred<T>['resolve'] = noop
+  let reject: Deferred<T>['reject'] = noop
   let promise: Promise<T> = new Promise((a, b) => {
     resolve = a
     reject = b

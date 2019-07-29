@@ -1,5 +1,5 @@
-import co, { read } from './costate'
+import co, { read, Costate } from './costate'
 
-export { read }
+export { read, Costate }
 
 export default co

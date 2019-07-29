@@ -16,6 +16,7 @@ export default function useCostate<T extends object = any>(initialState: T): [T,
       }
     }
 
+    // tslint:disable-next-line: no-floating-promises
     comsume()
 
     return () => {

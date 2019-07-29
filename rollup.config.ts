@@ -12,8 +12,8 @@ const libraryName = 'costate'
 export default {
   input: `src/index.ts`,
   output: [
-    { file: pkg.main, name: camelCase(libraryName), format: 'umd', sourcemap: true },
-    { file: pkg.module, format: 'es', sourcemap: true },
+    { file: 'dist/costate.umd.js', name: camelCase(libraryName), format: 'umd', sourcemap: true },
+    { file: 'dist/costate.es.js', format: 'es', sourcemap: true },
   ],
   // Indicate here external modules you don't wanna include in your bundle (i.e.: 'lodash')
   external: [],
