@@ -1,5 +1,5 @@
 import 'jest'
-import co, { Costate } from '../src'
+import co, { watch, Costate } from '../src/costate'
 
 describe('costate', () => {
   it('works correctly', done => {
@@ -33,6 +33,30 @@ describe('costate', () => {
 
     // tslint:disable-next-line: no-floating-promises
     comsumer()
+    provider()
+  })
+
+  it('can be watched', done => {
+    let costate = co({ count: 0 })
+
+    let i = 0
+
+    let unwatch = watch(costate, ({ count }) => {
+      expect(count).toBe(i)
+      if (count >= 2) {
+        unwatch()
+        done()
+      }
+    })
+
+    let timer
+    let provider = () => {
+      timer = setInterval(() => {
+        costate.count = ++i
+      }, 10)
+    }
+
+    // tslint:disable-next-line: no-floating-promises
     provider()
   })
 })

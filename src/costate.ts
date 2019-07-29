@@ -2,8 +2,9 @@ import { isArray, isObject, merge, createDeferred } from './util'
 
 const IMMUTABLE = Symbol('IMMUTABLE')
 const PARENTS = Symbol('PARENTS')
+const PROMISE = Symbol('PROMISE')
 
-const internalKeys = [IMMUTABLE, PARENTS]
+const internalKeys = [IMMUTABLE, PARENTS, PROMISE]
 
 export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
@@ -109,6 +110,9 @@ const co = <T extends object>(state: T): Costate<T> => {
     [PARENTS]: {
       value: parents
     },
+    [PROMISE]: {
+      value: () => deferred.promise
+    },
     [Symbol.asyncIterator]: {
       value: async function*() {
         while (true) yield await deferred.promise
@@ -122,3 +126,37 @@ const co = <T extends object>(state: T): Costate<T> => {
 }
 
 export default co
+
+export type CostateValue<R extends Costate<any>> = R extends Costate<infer S> ? S : never
+
+type unwatch = () => void
+export type CostateWatcher = <T extends Costate<any>>(state: CostateValue<T>) => void
+
+export const watch = <T extends Costate<any>>(costate: T, watcher: CostateWatcher): unwatch => {
+  if (!isCostate(costate)) {
+    throw new Error(`Expected costate, but received ${costate}`)
+  }
+
+  if (typeof watcher !== 'function') {
+    throw new Error(`Expected watcher to be a function, instead of ${watcher}`)
+  }
+
+  let unwatched = false
+
+  let consume = state => {
+    if (unwatched) return
+    watcher(state)
+    f()
+  }
+
+  let f = () => {
+    if (unwatched) return
+    costate[PROMISE]().then(consume)
+  }
+
+  f()
+
+  return () => {
+    unwatched = true
+  }
+}
