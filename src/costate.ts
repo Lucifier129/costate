@@ -7,6 +7,8 @@ const COSTATE = Symbol('COSTATE')
 
 const internalKeys = [IMMUTABLE, PARENTS, PROMISE, COSTATE]
 
+const SymbolAsyncIterator = Symbol.asyncIterator
+
 export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
 export const isLinkedState = (input: any) => !!(input && input[COSTATE])
@@ -22,6 +24,7 @@ type Key = string | number
 type Keys = Key[]
 
 type Connector = {
+  parents: Map<Costate<any>, Key | Keys>
   notify: () => void
   connect: (child: Costate<any>, Key) => void
   disconnect: (child: Costate<any>, Key) => void
@@ -75,13 +78,8 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
     }
   }
 
-  Object.defineProperty(proxy, PARENTS, {
-    value: parents,
-    enumerable: false,
-    writable: false
-  })
-
   return {
+    parents,
     notify,
     connect,
     disconnect
@@ -166,14 +164,17 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
   let target = isArrayType ? [] : {}
 
-  let uid = 0
+  let uid = -1
 
   let notify = (key: Key) => {
+    // uid < 0 means internal merging, ignore it
+    if (uid < 0) return
+
     if (typeof key === 'symbol') {
-      if (internalKeys.indexOf(key) !== -1) return
+      if (internalKeys.includes(key)) return
     }
 
-    // notify connected parents
+    // notify the connected parents
     connector.notify()
 
     // tslint:disable-next-line: no-floating-promises
@@ -186,7 +187,19 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
     deferred = createDeferred<T>()
   }
 
+  let asyncIterator = async function*() {
+    while (true) yield await deferred.promise
+  }
+
   let handlers: ProxyHandler<T> = {
+    get(target, key, receiver) {
+      if (key === IMMUTABLE) return immutable.compute
+      if (key === PROMISE) return deferred.promise
+      if (key === PARENTS) return connector.parents
+      if (SymbolAsyncIterator && key === SymbolAsyncIterator) return asyncIterator
+
+      return Reflect.get(target, key, receiver)
+    },
     set(target, key, value, receiver) {
       if (typeof key === 'symbol') {
         return Reflect.set(target, key, value, receiver)
@@ -244,27 +257,9 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   let connector = createConnector(proxy)
   let immutable = createImmutable(proxy)
 
-  Object.defineProperties(proxy, {
-    [IMMUTABLE]: {
-      value: immutable.compute,
-      enumerable: false,
-      writable: false
-    },
-    [PROMISE]: {
-      value: () => deferred.promise,
-      enumerable: false,
-      writable: false
-    },
-    [Symbol.asyncIterator]: {
-      value: async function*() {
-        while (true) yield await deferred.promise
-      },
-      enumerable: false,
-      writable: false
-    }
-  })
-
   merge(proxy, state)
+
+  uid += 1
 
   return proxy
 }
@@ -295,7 +290,7 @@ export const watch = <T extends Costate<any>>(costate: T, watcher: CostateWatche
 
   let f = () => {
     if (unwatched) return
-    costate[PROMISE]().then(consume)
+    costate[PROMISE].then(consume)
   }
 
   f()
