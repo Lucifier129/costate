@@ -5,8 +5,6 @@ const PARENTS = Symbol('PARENTS')
 const PROMISE = Symbol('PROMISE')
 const COSTATE = Symbol('COSTATE')
 
-const internalKeys = [IMMUTABLE, PARENTS, PROMISE, COSTATE]
-
 const SymbolAsyncIterator = Symbol.asyncIterator
 
 export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
@@ -168,7 +166,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   let uid = 0
   let consuming = false
 
-  let notify = (key: Key) => {
+  let notify = () => {
     // notify the connected parents
     connector.notify()
 
@@ -234,7 +232,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
         connector.disconnect(prevValue, key)
       }
 
-      notify(key)
+      notify()
 
       return true
     },
@@ -253,7 +251,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
       immutable.deleteProperty(key)
       delete target[key]
 
-      notify(key)
+      notify()
 
       return true
     }
@@ -281,9 +279,9 @@ export const watch = <T extends Costate<any>>(costate: T, watcher: CostateWatche
     throw new Error(`Expected costate, but received ${costate}`)
   }
 
-  // if (typeof watcher !== 'function') {
-  //   throw new Error(`Expected watcher to be a function, instead of ${watcher}`)
-  // }
+  if (typeof watcher !== 'function') {
+    throw new Error(`Expected watcher to be a function, instead of ${watcher}`)
+  }
 
   let unwatched = false
 
