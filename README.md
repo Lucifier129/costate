@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Lucifier129/costate/blob/master/LICENSE)
 [![Twitter: guyingjie129](https://img.shields.io/twitter/follow/guyingjie129.svg?style=social)](https://twitter.com/guyingjie129)
 
-> A state management library inspired by vue and immer
+> A state management library for react inspired by vue 3.0 reactivity api and immer
 
 ### 🏠 [Homepage](https://github.com/Lucifier129/costate#readme)
 
