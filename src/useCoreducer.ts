@@ -5,7 +5,7 @@ import useCostate from './useCostate'
 export default function useCoreducer<State extends Array<any> | object, Action>(
   reducer: (costate: Costate<State>, action: Action) => void,
   initialState: State | Costate<State>
-): [State, Dispatch<Action>, Costate<State>]
+): [State, Dispatch<Action>]
 
 export default function useCoreducer(coreducer, initialState) {
   let state = useCostate(initialState)
