@@ -92,7 +92,6 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
 const createImmutable = costate => {
   let isArrayType = isArray(costate)
   let immutableTarget = isArrayType ? [] : {}
-  let pendingOperators: Record<Key, 'set' | 'delete'> = {}
 
   let link = () => {
     Object.defineProperty(immutableTarget, COSTATE, {
@@ -100,42 +99,30 @@ const createImmutable = costate => {
     })
   }
 
-  let copy = () => {
-    if (isArrayType) {
-      immutableTarget = [...(immutableTarget as any[])]
-    } else {
-      immutableTarget = { ...immutableTarget }
-    }
-    link()
-  }
+  let isDirty = false
 
-  let set = key => {
-    pendingOperators[key] = 'set'
-  }
-
-  let deleteProperty = key => {
-    pendingOperators[key] = 'delete'
+  let mark = () => {
+    isDirty = true
   }
 
   let compute = () => {
-    let entries = Object.entries(pendingOperators)
+    if (!isDirty) return immutableTarget
 
-    if (entries.length === 0) {
-      return immutableTarget
-    }
+    isDirty = false
 
-    pendingOperators = {}
-
-    // copy on write
-    copy()
-
-    for (let [key, type] of entries) {
-      if (type === 'set') {
+    if (isArrayType) {
+      immutableTarget = []
+      for (let i = 0; i < costate.length; i++) {
+        immutableTarget[i] = read(costate[i])
+      }
+    } else {
+      immutableTarget = {}
+      for (let key in costate) {
         immutableTarget[key] = read(costate[key])
-      } else if (type === 'delete') {
-        delete immutableTarget[key]
       }
     }
+
+    link()
 
     return immutableTarget
   }
@@ -143,8 +130,7 @@ const createImmutable = costate => {
   link()
 
   return {
-    set,
-    deleteProperty,
+    mark,
     compute
   }
 }
@@ -205,6 +191,8 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
       return Reflect.get(target, key, receiver)
     },
     set(target, key, value, receiver) {
+      let prevValue = target[key]
+
       if (typeof key === 'symbol') {
         return Reflect.set(target, key, value, receiver)
       }
@@ -214,8 +202,6 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
         return true
       }
 
-      let prevValue = target[key]
-
       if (isObject(value) || isArray(value)) {
         value = co(value)
       }
@@ -224,7 +210,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
         connector.connect(value, key)
       }
 
-      immutable.set(key)
+      immutable.mark()
       target[key] = value
 
       // disconnnect prev child
@@ -248,7 +234,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
         connector.disconnect(value, key)
       }
 
-      immutable.deleteProperty(key)
+      immutable.mark()
       delete target[key]
 
       notify()
