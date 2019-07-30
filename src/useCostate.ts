@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
-import co, { read, watch, isLinkedState, Costate } from './costate'
+import co, { watch, read, isLinkedState } from './costate'
 
-export default function useCostate<T extends object = any>(initialState: T): [T, Costate<T>] {
+export default function useCostate<T extends any[] | object = any>(initialState: T): T {
   let costate = useMemo(() => co(initialState), [])
-  let [_, setState] = useState<T>(initialState)
+  let [_, setState] = useState<T>()
 
   useEffect(() => {
     /**
@@ -14,5 +14,5 @@ export default function useCostate<T extends object = any>(initialState: T): [T,
     return watch(costate, setState)
   }, [])
 
-  return [read(costate), costate]
+  return read(costate)
 }

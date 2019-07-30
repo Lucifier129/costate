@@ -1,4 +1,5 @@
 import 'jest'
+import co from '../src'
 import useCostate from '../src/useCostate'
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom'
@@ -34,10 +35,10 @@ describe('useCostate', () => {
 
   it('works corrently', async () => {
     let Test = () => {
-      let [state, costate] = useCostate({ count: 0 })
+      let state = useCostate({ count: 0 })
 
       let handleClick = () => {
-        costate.count += 1
+        co(state).count += 1
       }
 
       return <button onClick={handleClick}>{state.count}</button>
@@ -68,48 +69,48 @@ describe('useCostate', () => {
     expect(button.textContent).toBe('2')
   })
 
-  // it('support linked state', async () => {
-  //   let contents = ['', 'a', 'ab', 'abc']
-  //   let App = () => {
-  //     let [state] = useCostate({ text: { value: ''} })
+  it('support linked state', async done => {
+    let contents = ['', 'a', 'ab', 'abc']
+    let inputs = ['a', 'ab', 'abc']
+    let App = () => {
+      let state = useCostate({ text: { value: '' } })
 
-  //     useEffect(() => {
-  //       expect(state.text.value).toBe(contents.shift())
-  //     }, [state.text])
+      useEffect(() => {
+        expect(state.text.value).toBe(contents.shift())
+        if (contents.length === 0) done()
+      }, [state.text])
 
-  //     return <Input text={state.text} />
-  //   }
+      return <Input text={state.text} />
+    }
 
-  //   let Input = props => {
-  //     let [text, cotext] = useCostate(props.text)
+    let Input = ({ text }) => {
+      let handleChange = () => {
+        co(text).value = inputs.shift()
+      }
 
-  //     let handleChange = event => {
-  //       cotext.value = event.target.value
-  //     }
+      return <input type="text" onClick={handleChange} onChange={handleChange} value={text.value} />
+    }
 
-  //     return <input type="text" onChange={handleChange} value={text.value} />
-  //   }
+    act(() => {
+      ReactDOM.render(<App />, container)
+    })
 
-  //   act(() => {
-  //     ReactDOM.render(<App />, container)
-  //   })
+    const input = container.querySelector('input')
 
-  //   const input = container.querySelector('input')
+    act(() => {
+      input.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
 
-  //   act(() => {
-  //     input.value = 'a'
-  //   })
+    await delay()
 
-  //   // await delay()
+    act(() => {
+      input.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
 
-  //   // expect(input.textContent).toBe('1')
+    await delay()
 
-  //   // act(() => {
-  //   //   input.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  //   // })
-
-  //   // await delay()
-
-  //   // expect(input.textContent).toBe('2')
-  // })
+    act(() => {
+      input.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+  })
 })
