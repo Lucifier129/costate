@@ -143,8 +143,6 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   if (isCostate(state)) return state as Costate<T>
   if (state[COSTATE]) return state[COSTATE] as Costate<T>
 
-  let deferred = createDeferred<T>()
-
   let isArrayType = isArray(state)
 
   let target = isArrayType ? [] : {}
@@ -162,6 +160,8 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
     // tslint:disable-next-line: no-floating-promises
     Promise.resolve(++uid).then(doNotify) // debounced by promise
   }
+
+  let deferred = createDeferred<T>()
 
   let doNotify = (n: number) => {
     if (n !== uid) return
@@ -191,8 +191,6 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
       return Reflect.get(target, key, receiver)
     },
     set(target, key, value, receiver) {
-      let prevValue = target[key]
-
       if (typeof key === 'symbol') {
         return Reflect.set(target, key, value, receiver)
       }
@@ -201,6 +199,8 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
       if (isArrayType && key === 'length' && value === (target as Array<any>).length) {
         return true
       }
+
+      let prevValue = target[key]
 
       if (isObject(value) || isArray(value)) {
         value = co(value)
