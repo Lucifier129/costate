@@ -15,7 +15,7 @@ export const read = <T>(input: Costate<T> | T): T => {
 
 export type Costate<T> = T & AsyncIterableIterator<T>
 
-type Key = string | number | symbol
+type Key = string | number
 type Keys = Key[]
 
 type Connector = {
@@ -55,7 +55,7 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
     if (!isArray(keys) || keys.length === 1) {
       parents.delete(proxy)
     } else {
-      let index = keys.findIndex(key)
+      let index = keys.indexOf(key)
       keys.splice(index, 1)
     }
   }
@@ -110,7 +110,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
   let timer: NodeJS.Timeout | null = null
 
-  let notify = (key: string | number | symbol) => {
+  let notify = (key: Key) => {
     if (typeof key === 'symbol') {
       if (internalKeys.indexOf(key) !== -1) return
     }
@@ -121,12 +121,18 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   }
 
   let doNotify = () => {
-    deferred.resolve(immutableTarget as T)
+    deferred.resolve(read(proxy))
     deferred = createDeferred<T>()
   }
 
+  let pendingOperators: Record<Key, 'set' | 'delete'> = {}
+
   let handlers: ProxyHandler<T> = {
-    set(target, key, value) {
+    set(target, key, value, receiver) {
+      if (typeof key === 'symbol') {
+        return Reflect.set(target, key, value, receiver)
+      }
+
       // list.push will trigger both index-key and length-key, ignore it
       if (isArrayType && key === 'length' && value === (target as Array<any>).length) {
         return true
@@ -142,10 +148,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
         connector.connect(value, key)
       }
 
-      // copy before assigning
-      copy()
-
-      immutableTarget[key] = read(value)
+      pendingOperators[key] = 'set'
       target[key] = value
 
       // disonnnect prev child
@@ -159,16 +162,17 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
     },
 
     deleteProperty(target, key) {
+      if (typeof key === 'symbol') {
+        return Reflect.deleteProperty(target, key)
+      }
+
       let value = target[key]
 
       if (isCostate(value)) {
         connector.disconnect(value, key)
       }
 
-      // copy before deleting
-      copy()
-
-      delete immutableTarget[key]
+      pendingOperators[key] = 'delete'
       delete target[key]
 
       notify(key)
@@ -182,7 +186,29 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
   Object.defineProperties(proxy, {
     [IMMUTABLE]: {
-      value: () => immutableTarget,
+      value: () => {
+        let entries = Object.entries(pendingOperators)
+
+        if (entries.length === 0) {
+          return immutableTarget
+        }
+
+        pendingOperators = {}
+
+        copy()
+
+        for (let [key, type] of entries) {
+          if (type === 'set') {
+            immutableTarget[key] = read(target[key])
+          } else if (type === 'delete') {
+            delete immutableTarget[key]
+          } else {
+            throw new Error(`Unknown Operator ${type}`)
+          }
+        }
+
+        return immutableTarget
+      },
       enumerable: false,
       writable: false
     },
