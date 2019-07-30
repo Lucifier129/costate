@@ -9,6 +9,8 @@ const internalKeys = [IMMUTABLE, PARENTS, PROMISE, COSTATE]
 
 export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
+export const isLinkedState = (input: any) => !!(input && input[COSTATE])
+
 export const read = <T>(input: Costate<T> | T): T => {
   if (!isCostate(input)) return input
   return input[IMMUTABLE]()
