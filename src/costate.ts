@@ -60,7 +60,7 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
     let parents = child[PARENTS] as Map<Costate<any>, Key | Keys>
     let keys = parents.get(proxy)
 
-    if (keys != null) return
+    if (keys == null) return
 
     if (!isArray(keys) || keys.length === 1) {
       parents.delete(proxy)
