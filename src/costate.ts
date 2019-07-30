@@ -42,22 +42,26 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
     }
 
     let keys = parents.get(proxy)
+
+    if (keys === key) return
+
     if (!isArray(keys)) {
       keys = [keys]
     }
+
     if (!keys.includes(key)) {
       keys.push(key)
     }
+
+    parents.set(proxy, keys)
   }
 
   let disconnect = (child, key) => {
     let parents = child[PARENTS] as Map<Costate<any>, Key | Keys>
-
-    if (!parents.has(proxy)) {
-      throw new Error(`${key} is not connected, it can't be delete`)
-    }
-
     let keys = parents.get(proxy)
+
+    if (keys != null) return
+
     if (!isArray(keys) || keys.length === 1) {
       parents.delete(proxy)
     } else {
@@ -72,6 +76,7 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
         parent[keys] = proxy
         continue
       }
+
       for (let key of keys) {
         parent[key] = proxy
       }
@@ -93,9 +98,7 @@ const createImmutable = costate => {
 
   let link = () => {
     Object.defineProperty(immutableTarget, COSTATE, {
-      writable: false,
-      enumerable: false,
-      value: costate
+      get: () => costate
     })
   }
 
@@ -133,8 +136,6 @@ const createImmutable = costate => {
         immutableTarget[key] = read(costate[key])
       } else if (type === 'delete') {
         delete immutableTarget[key]
-      } else {
-        throw new Error(`Unknown Operator ${type}`)
       }
     }
 
@@ -164,17 +165,10 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
   let target = isArrayType ? [] : {}
 
-  let uid = -1
+  let uid = 0
   let consuming = false
 
   let notify = (key: Key) => {
-    // uid < 0 means internal merging, ignore it
-    if (uid < 0) return
-
-    if (typeof key === 'symbol') {
-      if (internalKeys.includes(key)) return
-    }
-
     // notify the connected parents
     connector.notify()
 
@@ -272,8 +266,6 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   // internal merging
   merge(proxy, state)
 
-  uid += 1
-
   return proxy
 }
 
@@ -289,9 +281,9 @@ export const watch = <T extends Costate<any>>(costate: T, watcher: CostateWatche
     throw new Error(`Expected costate, but received ${costate}`)
   }
 
-  if (typeof watcher !== 'function') {
-    throw new Error(`Expected watcher to be a function, instead of ${watcher}`)
-  }
+  // if (typeof watcher !== 'function') {
+  //   throw new Error(`Expected watcher to be a function, instead of ${watcher}`)
+  // }
 
   let unwatched = false
 

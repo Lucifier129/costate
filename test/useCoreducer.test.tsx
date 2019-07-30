@@ -4,7 +4,7 @@ import React from 'react'
 import ReactDOM from 'react-dom'
 import { act } from 'react-dom/test-utils'
 
-const delay = (timeout = 4) => new Promise(resolve => setTimeout(resolve, timeout))
+const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 
 /**
  * Suppress React 16.8 act() warnings globally.

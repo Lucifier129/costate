@@ -1,5 +1,5 @@
 import 'jest'
-import co, { watch, read, isLinkedState, isCostate, Costate } from '../src/costate'
+import co, { watch, read, isLinkedState, isCostate, Costate } from '../src'
 
 const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 
@@ -28,6 +28,12 @@ describe('co', () => {
 
     // tslint:disable-next-line: no-floating-promises
     provider()
+  })
+
+  it('should throw error when watch target is not a costate', () => {
+    expect(() => {
+      watch({}, () => {})
+    }).toThrow()
   })
 
   it('works correctly with object', done => {
@@ -137,26 +143,47 @@ describe('co', () => {
     expect(costate.hasOwnProperty('b')).toBe(false)
   })
 
-  it('can support multiple keys has the same costate', done => {
+  it('supports multiple keys has the same costate', () => {
     let cochild = co({ a: 1, b: 2 })
     let coparent = co({ child1: cochild, child2: cochild })
 
-    watch(coparent, state => {
-      expect(state.child1 === state.child2).toBe(true)
-      expect(state).toEqual({
-        child1: {
-          a: 1,
-          b: 1
-        },
-        child2: {
-          a: 1,
-          b: 1
-        }
-      })
-      done()
+    cochild.b -= 1
+
+    let state = read(coparent)
+
+    expect(state.child1 === state.child2).toBe(true)
+    expect(state).toEqual({
+      child1: {
+        a: 1,
+        b: 1
+      },
+      child2: {
+        a: 1,
+        b: 1
+      }
     })
 
-    cochild.b -= 1
+    delete coparent.child1
+
+    let state1 = read(coparent)
+
+    expect(state1).toEqual({
+      child2: {
+        a: 1,
+        b: 1
+      }
+    })
+
+    cochild.a += 1
+
+    let state2 = read(coparent)
+
+    expect(state2).toEqual({
+      child2: {
+        a: 2,
+        b: 1
+      }
+    })
   })
 
   it('should support debounce', done => {
@@ -283,5 +310,56 @@ describe('co', () => {
 
     expect(list3).toEqual([{ value: 2 }, { value: 2 }, { value: 2 }])
     expect(list5).toEqual([{ value: 2 }, { value: 2 }, { value: 2 }])
+  })
+
+  it('should ignore the change of symbol key', () => {
+    let symbol0: any = Symbol('0')
+    let symbol1: any = Symbol('1')
+    let costate = co({ count: 1, [symbol0]: 1, [symbol1]: 1 })
+    let state0 = read(costate)
+
+    costate[symbol0] += 1
+
+    let state1 = read(costate)
+
+    expect(state0 === state1).toBe(true)
+
+    delete costate[symbol1]
+
+    let state2 = read(costate)
+
+    expect(state0 === state2).toBe(true)
+  })
+
+  it('should throw error if the arg passing to co is not object or array', () => {
+    expect(() => {
+      co(() => 1)
+    }).toThrow()
+  })
+
+  it('should disconnect correctly', () => {
+    let costate = co({ a: { value: 1 }, b: { value: 2 } })
+
+    costate.a.value += 1
+
+    let state1 = read(costate)
+
+    expect(state1.a.value).toBe(2)
+
+    let oldA = costate.a
+
+    costate.a = { value: 1 }
+
+    let state2 = read(costate)
+
+    expect(state2.a.value).toBe(1)
+
+    oldA.value += 1
+
+    expect(read(oldA)).toEqual({ value: 3 })
+
+    let state3 = read(costate)
+
+    expect(state3.a).toEqual({ value: 1 })
   })
 })

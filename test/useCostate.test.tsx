@@ -1,10 +1,10 @@
 import 'jest'
 import useCostate from '../src/useCostate'
-import React from 'react'
+import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import { act } from 'react-dom/test-utils'
 
-const delay = (timeout = 4) => new Promise(resolve => setTimeout(resolve, timeout))
+const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 
 /**
  * Suppress React 16.8 act() warnings globally.
@@ -67,4 +67,49 @@ describe('useCostate', () => {
 
     expect(button.textContent).toBe('2')
   })
+
+  // it('support linked state', async () => {
+  //   let contents = ['', 'a', 'ab', 'abc']
+  //   let App = () => {
+  //     let [state] = useCostate({ text: { value: ''} })
+
+  //     useEffect(() => {
+  //       expect(state.text.value).toBe(contents.shift())
+  //     }, [state.text])
+
+  //     return <Input text={state.text} />
+  //   }
+
+  //   let Input = props => {
+  //     let [text, cotext] = useCostate(props.text)
+
+  //     let handleChange = event => {
+  //       cotext.value = event.target.value
+  //     }
+
+  //     return <input type="text" onChange={handleChange} value={text.value} />
+  //   }
+
+  //   act(() => {
+  //     ReactDOM.render(<App />, container)
+  //   })
+
+  //   const input = container.querySelector('input')
+
+  //   act(() => {
+  //     input.value = 'a'
+  //   })
+
+  //   // await delay()
+
+  //   // expect(input.textContent).toBe('1')
+
+  //   // act(() => {
+  //   //   input.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  //   // })
+
+  //   // await delay()
+
+  //   // expect(input.textContent).toBe('2')
+  // })
 })
