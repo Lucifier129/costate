@@ -165,6 +165,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   let target = isArrayType ? [] : {}
 
   let uid = -1
+  let consuming = false
 
   let notify = (key: Key) => {
     // uid < 0 means internal merging, ignore it
@@ -177,6 +178,9 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
     // notify the connected parents
     connector.notify()
 
+    // not consuming, no need to resolve
+    if (!consuming) return
+
     // tslint:disable-next-line: no-floating-promises
     Promise.resolve(++uid).then(doNotify) // debounced by promise
   }
@@ -185,18 +189,26 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
     if (n !== uid) return
     deferred.resolve(read(proxy))
     deferred = createDeferred<T>()
+    consuming = false
   }
 
   let asyncIterator = async function*() {
-    while (true) yield await deferred.promise
+    while (true) yield await proxy[PROMISE]
   }
 
   let handlers: ProxyHandler<T> = {
     get(target, key, receiver) {
       if (key === IMMUTABLE) return immutable.compute
-      if (key === PROMISE) return deferred.promise
       if (key === PARENTS) return connector.parents
-      if (SymbolAsyncIterator && key === SymbolAsyncIterator) return asyncIterator
+
+      if (key === PROMISE) {
+        consuming = true
+        return deferred.promise
+      }
+
+      if (SymbolAsyncIterator && key === SymbolAsyncIterator) {
+        return asyncIterator
+      }
 
       return Reflect.get(target, key, receiver)
     },
@@ -223,7 +235,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
       immutable.set(key)
       target[key] = value
 
-      // disonnnect prev child
+      // disconnnect prev child
       if (isCostate(prevValue) && value !== prevValue) {
         connector.disconnect(prevValue, key)
       }
@@ -257,6 +269,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   let connector = createConnector(proxy)
   let immutable = createImmutable(proxy)
 
+  // internal merging
   merge(proxy, state)
 
   uid += 1
