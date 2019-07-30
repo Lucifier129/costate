@@ -85,6 +85,59 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
   }
 }
 
+const createImmutable = source => {
+  let isArrayType = isArray(source)
+  let immutableTarget = isArrayType ? [] : {}
+  let pendingOperators: Record<Key, 'set' | 'delete'> = {}
+
+  let copy = () => {
+    if (isArrayType) {
+      immutableTarget = [...(immutableTarget as any[])]
+    } else {
+      immutableTarget = { ...immutableTarget }
+    }
+  }
+
+  let set = key => {
+    pendingOperators[key] = 'set'
+  }
+
+  let deleteProperty = key => {
+    pendingOperators[key] = 'delete'
+  }
+
+  let compute = () => {
+    let entries = Object.entries(pendingOperators)
+
+    if (entries.length === 0) {
+      return immutableTarget
+    }
+
+    pendingOperators = {}
+
+    // copy on write
+    copy()
+
+    for (let [key, type] of entries) {
+      if (type === 'set') {
+        immutableTarget[key] = read(source[key])
+      } else if (type === 'delete') {
+        delete immutableTarget[key]
+      } else {
+        throw new Error(`Unknown Operator ${type}`)
+      }
+    }
+
+    return immutableTarget
+  }
+
+  return {
+    set,
+    deleteProperty,
+    compute
+  }
+}
+
 const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   if (!isObject(state) && !isArray(state)) {
     throw new Error(`Expect state to be array or object, instead of ${state}`)
@@ -98,34 +151,27 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
   let target = isArrayType ? [] : {}
 
-  let immutableTarget = isArrayType ? [] : {}
+  let immutable = createImmutable(target)
 
-  let copy = () => {
-    if (isArray(immutableTarget)) {
-      immutableTarget = [...immutableTarget]
-    } else {
-      immutableTarget = { ...immutableTarget }
-    }
-  }
-
-  let timer: NodeJS.Timeout | null = null
+  let uid = 0
 
   let notify = (key: Key) => {
     if (typeof key === 'symbol') {
       if (internalKeys.indexOf(key) !== -1) return
     }
 
+    // notify connected parents
     connector.notify()
-    if (timer != null) clearTimeout(timer)
-    timer = setTimeout(doNotify, 0)
+
+    // tslint:disable-next-line: no-floating-promises
+    Promise.resolve(++uid).then(doNotify) // debounced by promise
   }
 
-  let doNotify = () => {
+  let doNotify = (n: number) => {
+    if (n !== uid) return
     deferred.resolve(read(proxy))
     deferred = createDeferred<T>()
   }
-
-  let pendingOperators: Record<Key, 'set' | 'delete'> = {}
 
   let handlers: ProxyHandler<T> = {
     set(target, key, value, receiver) {
@@ -148,7 +194,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
         connector.connect(value, key)
       }
 
-      pendingOperators[key] = 'set'
+      immutable.set(key)
       target[key] = value
 
       // disonnnect prev child
@@ -172,7 +218,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
         connector.disconnect(value, key)
       }
 
-      pendingOperators[key] = 'delete'
+      immutable.deleteProperty(key)
       delete target[key]
 
       notify(key)
@@ -186,29 +232,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
   Object.defineProperties(proxy, {
     [IMMUTABLE]: {
-      value: () => {
-        let entries = Object.entries(pendingOperators)
-
-        if (entries.length === 0) {
-          return immutableTarget
-        }
-
-        pendingOperators = {}
-
-        copy()
-
-        for (let [key, type] of entries) {
-          if (type === 'set') {
-            immutableTarget[key] = read(target[key])
-          } else if (type === 'delete') {
-            delete immutableTarget[key]
-          } else {
-            throw new Error(`Unknown Operator ${type}`)
-          }
-        }
-
-        return immutableTarget
-      },
+      value: immutable.compute,
       enumerable: false,
       writable: false
     },
