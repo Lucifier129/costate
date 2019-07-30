@@ -3,8 +3,9 @@ import { isArray, isObject, merge, createDeferred } from './util'
 const IMMUTABLE = Symbol('IMMUTABLE')
 const PARENTS = Symbol('PARENTS')
 const PROMISE = Symbol('PROMISE')
+const COSTATE = Symbol('COSTATE')
 
-const internalKeys = [IMMUTABLE, PARENTS, PROMISE]
+const internalKeys = [IMMUTABLE, PARENTS, PROMISE, COSTATE]
 
 export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
@@ -85,10 +86,18 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
   }
 }
 
-const createImmutable = source => {
-  let isArrayType = isArray(source)
+const createImmutable = costate => {
+  let isArrayType = isArray(costate)
   let immutableTarget = isArrayType ? [] : {}
   let pendingOperators: Record<Key, 'set' | 'delete'> = {}
+
+  let link = () => {
+    Object.defineProperty(immutableTarget, COSTATE, {
+      writable: false,
+      enumerable: false,
+      value: costate
+    })
+  }
 
   let copy = () => {
     if (isArrayType) {
@@ -96,6 +105,7 @@ const createImmutable = source => {
     } else {
       immutableTarget = { ...immutableTarget }
     }
+    link()
   }
 
   let set = key => {
@@ -120,7 +130,7 @@ const createImmutable = source => {
 
     for (let [key, type] of entries) {
       if (type === 'set') {
-        immutableTarget[key] = read(source[key])
+        immutableTarget[key] = read(costate[key])
       } else if (type === 'delete') {
         delete immutableTarget[key]
       } else {
@@ -130,6 +140,8 @@ const createImmutable = source => {
 
     return immutableTarget
   }
+
+  link()
 
   return {
     set,
@@ -144,14 +156,13 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   }
 
   if (isCostate(state)) return state as Costate<T>
+  if (state[COSTATE]) return state[COSTATE] as Costate<T>
 
   let deferred = createDeferred<T>()
 
   let isArrayType = isArray(state)
 
   let target = isArrayType ? [] : {}
-
-  let immutable = createImmutable(target)
 
   let uid = 0
 
@@ -229,6 +240,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
   let proxy = new Proxy(target, handlers) as Costate<T>
   let connector = createConnector(proxy)
+  let immutable = createImmutable(proxy)
 
   Object.defineProperties(proxy, {
     [IMMUTABLE]: {
