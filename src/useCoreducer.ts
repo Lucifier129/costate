@@ -1,6 +1,5 @@
-import { useRef, useCallback, useEffect, Dispatch } from 'react'
-import co, { Costate } from './costate'
-import useCostate from './useCostate'
+import { useState, useMemo, useRef, useCallback, useEffect, Dispatch } from 'react'
+import co, { read, Costate } from './costate'
 
 export default function useCoreducer<State extends Array<any> | object, Action>(
   reducer: (costate: Costate<State>, action: Action) => void,
@@ -8,16 +7,20 @@ export default function useCoreducer<State extends Array<any> | object, Action>(
 ): [State, Dispatch<Action>]
 
 export default function useCoreducer(coreducer, initialState) {
-  let state = useCostate(initialState)
-  let costateRef = useRef(co(state))
+  let [_, setState] = useState()
+  let costate = useMemo(() => co(initialState), [])
   let coreducerRef = useRef(coreducer)
-  let dispatch = useCallback(action => {
-    coreducerRef.current(costateRef.current, action)
-  }, [])
+  let dispatch = useCallback(
+    action => {
+      coreducerRef.current(costate, action)
+      setState(read(costate))
+    },
+    [costate]
+  )
 
   useEffect(() => {
     coreducerRef.current = coreducer
   }, [coreducer])
 
-  return [state, dispatch]
+  return [read(costate), dispatch]
 }

@@ -3,7 +3,7 @@ import co, { watch, read, isLinkedState } from './costate'
 
 export default function useCostate<T extends any[] | object = any>(initialState: T): T {
   let costate = useMemo(() => co(initialState), [])
-  let [_, setState] = useState<T>()
+  let [state, setState] = useState<T>(() => read(costate))
 
   useEffect(() => {
     /**
@@ -14,5 +14,5 @@ export default function useCostate<T extends any[] | object = any>(initialState:
     return watch(costate, setState)
   }, [])
 
-  return read(costate)
+  return state
 }
