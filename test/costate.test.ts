@@ -1,5 +1,5 @@
 import 'jest'
-import co, { watch, read, isLinkedState, isCostate, Costate } from '../src'
+import co, { watch, read, remove, hasCostate, isCostate, Costate } from '../src'
 
 const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 
@@ -128,7 +128,7 @@ describe('co', () => {
     provider()
   })
 
-  it('can detect delete property', done => {
+  it('can detect delete object property', done => {
     let costate = co({ a: 1, b: 2 })
 
     watch(costate, state => {
@@ -141,6 +141,18 @@ describe('co', () => {
     delete costate.b
 
     expect(costate.hasOwnProperty('b')).toBe(false)
+  })
+
+  it('can detect delete array item', () => {
+    let colist = co([1, 2, 3])
+    let list0 = read(colist)
+
+    colist.splice(1, 1)
+
+    let list1 = read(colist)
+
+    expect(list0).toEqual([1, 2, 3])
+    expect(list1).toEqual([1, 3])
   })
 
   it('supports multiple keys has the same costate', () => {
@@ -206,8 +218,8 @@ describe('co', () => {
     expect(isCostate(costate)).toBe(true)
     expect(isCostate({ count: 0 })).toBe(false)
 
-    expect(isLinkedState(state)).toBe(true)
-    expect(isLinkedState({ count: 0 })).toBe(false)
+    expect(hasCostate(state)).toBe(true)
+    expect(hasCostate({ count: 0 })).toBe(false)
 
     expect(state).toEqual({ count: 0 })
 
@@ -361,5 +373,49 @@ describe('co', () => {
     let state3 = read(costate)
 
     expect(state3.a).toEqual({ value: 1 })
+  })
+
+  it('costate object can be removed', done => {
+    let cochild = co({ value: 1 })
+    let costate = co({ a: cochild, b: { value: 2 }, c: cochild, d: { value: 3 } })
+    let state0 = read(costate)
+
+    watch(costate, state => {
+      expect(state === state1).toBe(true)
+      done()
+    })
+
+    expect(costate.a === costate.c).toBe(true)
+    expect(costate.a === cochild).toBe(true)
+
+    remove(costate.a)
+    remove(costate.d)
+
+    let state1 = read(costate)
+
+    expect(state0).toEqual({ a: { value: 1 }, b: { value: 2 }, c: { value: 1 }, d: { value: 3 } })
+    expect(state1).toEqual({ b: { value: 2 } })
+  })
+
+  it('costate array can be removed', done => {
+    let coitem = co({ value: 1 })
+    let colist = co([coitem, { value: 2 }, coitem, { value: 3 }])
+    let list0 = read(colist)
+
+    watch(colist, list => {
+      expect(list === list1).toBe(true)
+      done()
+    })
+
+    expect(colist[0] === colist[2]).toBe(true)
+    expect(colist[0] === coitem).toBe(true)
+
+    remove(colist[3])
+    remove(colist[0])
+
+    let list1 = read(colist)
+
+    expect(list0).toEqual([{ value: 1 }, { value: 2 }, { value: 1 }, { value: 3 }])
+    expect(list1).toEqual([{ value: 2 }])
   })
 })

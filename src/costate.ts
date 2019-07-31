@@ -1,7 +1,7 @@
 import { isArray, isObject, merge, createDeferred } from './util'
 
 const IMMUTABLE = Symbol('IMMUTABLE')
-const PARENTS = Symbol('PARENTS')
+const CONNECTOR = Symbol('CONNECTOR')
 const PROMISE = Symbol('PROMISE')
 const COSTATE = Symbol('COSTATE')
 
@@ -9,7 +9,7 @@ const SymbolAsyncIterator = Symbol.asyncIterator
 
 export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
-export const isLinkedState = (input: any) => !!(input && input[COSTATE])
+export const hasCostate = (input: any) => !!(input && input[COSTATE])
 
 export const read = <T>(input: Costate<T> | T): T => {
   if (!isCostate(input)) return input
@@ -26,20 +26,19 @@ type Connector = {
   notify: () => void
   connect: (child: Costate<any>, Key) => void
   disconnect: (child: Costate<any>, Key) => void
+  clear: () => void
 }
 
 const createConnector = <T = any>(proxy: Costate<T>): Connector => {
-  let parents = new Map()
+  let parents = new Map<Costate<any>, Key | Keys>()
 
-  let connect = (child, key) => {
-    let parents = child[PARENTS] as Map<Costate<any>, Key | Keys>
-
-    if (!parents.has(proxy)) {
-      parents.set(proxy, key)
+  let connect = (parent, key) => {
+    if (!parents.has(parent)) {
+      parents.set(parent, key)
       return
     }
 
-    let keys = parents.get(proxy)
+    let keys = parents.get(parent)
 
     if (keys === key) return
 
@@ -51,17 +50,16 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
       keys.push(key)
     }
 
-    parents.set(proxy, keys)
+    parents.set(parent, keys)
   }
 
-  let disconnect = (child, key) => {
-    let parents = child[PARENTS] as Map<Costate<any>, Key | Keys>
-    let keys = parents.get(proxy)
+  let disconnect = (parent, key) => {
+    let keys = parents.get(parent)
 
     if (keys == null) return
 
     if (!isArray(keys) || keys.length === 1) {
-      parents.delete(proxy)
+      parents.delete(parent)
     } else {
       let index = keys.indexOf(key)
       keys.splice(index, 1)
@@ -81,8 +79,34 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
     }
   }
 
+  let remove = (parent, key) => {
+    if (isArray(parent)) {
+      let index = parent.indexOf(proxy)
+      if (index !== -1) {
+        parent.splice(index, 1)
+      }
+    } else {
+      delete parent[key]
+    }
+  }
+
+  let clear = () => {
+    for (let [parent, keys] of parents) {
+      if (!isArray(keys)) {
+        remove(parent, keys)
+        continue
+      }
+
+      // remove will cause mutable keys, copy to make sure for-of work expectly
+      for (let key of [...keys]) {
+        remove(parent, key)
+      }
+    }
+  }
+
   return {
     parents,
+    clear,
     notify,
     connect,
     disconnect
@@ -177,7 +201,7 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
   let handlers: ProxyHandler<T> = {
     get(target, key, receiver) {
       if (key === IMMUTABLE) return immutable.compute
-      if (key === PARENTS) return connector.parents
+      if (key === CONNECTOR) return connector
 
       if (key === PROMISE) {
         consuming = true
@@ -207,15 +231,15 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
       }
 
       if (isCostate(value)) {
-        connector.connect(value, key)
+        value[CONNECTOR].connect(proxy, key)
       }
 
       immutable.mark()
-      target[key] = value
+      Reflect.set(target, key, value, receiver)
 
       // disconnnect prev child
-      if (isCostate(prevValue) && value !== prevValue) {
-        connector.disconnect(prevValue, key)
+      if (value !== prevValue && isCostate(prevValue)) {
+        prevValue[CONNECTOR].disconnect(proxy, key)
       }
 
       notify()
@@ -231,11 +255,11 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
       let value = target[key]
 
       if (isCostate(value)) {
-        connector.disconnect(value, key)
+        value[CONNECTOR].disconnect(proxy, key)
       }
 
       immutable.mark()
-      delete target[key]
+      Reflect.deleteProperty(target, key)
 
       notify()
 
@@ -287,4 +311,11 @@ export const watch = <T extends Costate<any>>(costate: T, watcher: CostateWatche
   return () => {
     unwatched = true
   }
+}
+
+export const remove = <T extends Costate<any>>(costate: T): void => {
+  if (!isCostate(costate)) {
+    throw new Error(`Expected costate, but got ${costate}`)
+  }
+  costate[CONNECTOR].clear()
 }
