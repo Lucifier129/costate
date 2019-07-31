@@ -1,14 +1,12 @@
 {
   "name": "costate",
   "version": "0.0.1",
-  "description": "A state management library inspired by vue and immer",
-  "main": "dist/costate.umd.js",
-  "module": "dist/costate.es.js",
+  "description": "A state management library for react inspired by vue 3.0 reactivity api and immer",
+  "main": "dist/lib/costate.js",
   "typings": "dist/types/costate.d.ts",
   "files": [
     "dist",
-    "react",
-    "index.js"
+    "react"
   ],
   "repository": {
     "type": "git",
@@ -19,7 +17,7 @@
   ],
   "author": "Jade Gu",
   "engines": {
-    "node": ">=6.0.0"
+    "node": ">=8.0.0"
   },
   "scripts": {
     "lint": "tslint  --project tsconfig.json -t codeFrame 'src/**/*.ts' 'test/**/*.ts'",
@@ -34,7 +32,8 @@
     "semantic-release": "semantic-release",
     "semantic-release-prepare": "ts-node tools/semantic-release-prepare",
     "precommit": "lint-staged",
-    "travis-deploy-once": "travis-deploy-once"
+    "travis-deploy-once": "travis-deploy-once",
+    "prepare": "npm run test && npm run build"
   },
   "lint-staged": {
     "{src,test}/**/*.ts": [
