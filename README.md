@@ -1,6 +1,7 @@
 # Welcome to costate 👋
-![Version](https://img.shields.io/badge/version-0.0.1-blue.svg?cacheSeconds=2592000)
-[![Build Status](https://travis-ci.org/Lucifier129/costate.svg?branch=master)](https://travis-ci.org/Lucifier129/costate) 
+
+[![npm version](https://img.shields.io/npm/v/costate.svg?style=flat)](https://www.npmjs.com/package/costate)
+[![Build Status](https://travis-ci.org/Lucifier129/costate.svg?branch=master)](https://travis-ci.org/Lucifier129/costate)
 [![Documentation](https://img.shields.io/badge/documentation-yes-brightgreen.svg)](https://github.com/Lucifier129/costate#readme)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/Lucifier129/costate/graphs/commit-activity)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Lucifier129/costate/blob/master/LICENSE)
@@ -26,8 +27,8 @@ npm run test
 
 👤 **Jade Gu**
 
-* Twitter: [@guyingjie129](https://twitter.com/guyingjie129)
-* Github: [@Lucifier129](https://github.com/Lucifier129)
+- Twitter: [@guyingjie129](https://twitter.com/guyingjie129)
+- Github: [@Lucifier129](https://github.com/Lucifier129)
 
 ## 🤝 Contributing
 
@@ -39,12 +40,12 @@ Feel free to check [issues page](https://github.com/Lucifier129/costate/issues).
 
 Give a ⭐️ if this project helped you!
 
-
 ## 📝 License
 
 Copyright © 2019 [Jade Gu](https://github.com/Lucifier129).
 
 This project is [MIT](https://github.com/Lucifier129/costate/blob/master/LICENSE) licensed.
 
-***
+---
+
 _This README was generated with ❤️ by [readme-md-generator](https://github.com/kefranabg/readme-md-generator)_
