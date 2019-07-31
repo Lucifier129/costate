@@ -279,12 +279,13 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
 export default co
 
-export type CostateValue<R extends Costate<any>> = R extends Costate<infer S> ? S : never
-
 type unwatch = () => void
-export type CostateWatcher = <T extends Costate<any>>(state: CostateValue<T>) => void
+export type CostateWatcher<T> = (state: T) => void
 
-export const watch = <T extends Costate<any>>(costate: T, watcher: CostateWatcher): unwatch => {
+export const watch = <T extends any[] | object = any>(
+  costate: Costate<T>,
+  watcher: CostateWatcher<T>
+): unwatch => {
   if (!isCostate(costate)) {
     throw new Error(`Expected costate, but received ${costate}`)
   }
@@ -313,7 +314,7 @@ export const watch = <T extends Costate<any>>(costate: T, watcher: CostateWatche
   }
 }
 
-export const remove = <T extends Costate<any>>(costate: T): void => {
+export const remove = <T extends any[] | object = any>(costate: Costate<T>): void => {
   if (!isCostate(costate)) {
     throw new Error(`Expected costate, but got ${costate}`)
   }

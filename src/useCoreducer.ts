@@ -1,5 +1,7 @@
-import { useState, useMemo, useRef, useCallback, useEffect, Dispatch } from 'react'
+import React, { Dispatch } from 'react'
 import co, { read, Costate } from './costate'
+
+const { useState, useMemo, useRef, useCallback, useEffect } = React
 
 export default function useCoreducer<State extends Array<any> | object, Action>(
   reducer: (costate: Costate<State>, action: Action) => void,

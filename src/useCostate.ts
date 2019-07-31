@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import React from 'react'
 import co, { watch, read, hasCostate } from './costate'
+
+const { useState, useEffect, useMemo } = React
 
 export default function useCostate<T extends any[] | object = any>(initialState: T): T {
   let costate = useMemo(() => co(initialState), [])

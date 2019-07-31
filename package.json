@@ -1,12 +1,11 @@
 {
   "name": "costate",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A state management library for react inspired by vue 3.0 reactivity api and immer",
-  "main": "dist/lib/costate.js",
-  "typings": "dist/types/costate.d.ts",
+  "main": "dist/lib/index.js",
+  "typings": "dist/types/index.d.ts",
   "files": [
-    "dist",
-    "react"
+    "dist"
   ],
   "repository": {
     "type": "git",
@@ -22,8 +21,7 @@
   "scripts": {
     "lint": "tslint  --project tsconfig.json -t codeFrame 'src/**/*.ts' 'test/**/*.ts'",
     "prebuild": "rimraf dist",
-    "build": "tsc --module commonjs && rollup -c rollup.config.ts && typedoc --out docs --target es6 --theme minimal --mode file src",
-    "start": "rollup -c rollup.config.ts -w",
+    "build": "tsc --module commonjs && typedoc --out docs --target es6 --theme minimal --mode file src",
     "test": "jest --coverage",
     "test:watch": "jest --coverage --watch",
     "test:prod": "npm run lint && npm run test -- --no-cache",
@@ -109,12 +107,6 @@
     "rimraf": "^2.6.2",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
-    "rollup": "^0.67.0",
-    "rollup-plugin-commonjs": "^9.1.8",
-    "rollup-plugin-json": "^3.1.0",
-    "rollup-plugin-node-resolve": "^3.4.0",
-    "rollup-plugin-sourcemaps": "^0.4.2",
-    "rollup-plugin-typescript2": "^0.18.0",
     "semantic-release": "^15.9.16",
     "shelljs": "^0.8.3",
     "travis-deploy-once": "^5.0.9",

@@ -1,5 +1,5 @@
 import 'jest'
-import co, { watch, read, remove, hasCostate, isCostate, Costate } from '../src'
+import co, { watch, read, remove, hasCostate, isCostate } from '../src'
 
 const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 
@@ -32,7 +32,7 @@ describe('co', () => {
 
   it('should throw error when watch target is not a costate', () => {
     expect(() => {
-      watch({}, () => {})
+      watch({} as any, () => {})
     }).toThrow()
   })
 
@@ -389,7 +389,7 @@ describe('co', () => {
     expect(costate.a === cochild).toBe(true)
 
     remove(costate.a)
-    remove(costate.d)
+    remove((costate as any).d)
 
     let state1 = read(costate)
 
@@ -410,8 +410,8 @@ describe('co', () => {
     expect(colist[0] === colist[2]).toBe(true)
     expect(colist[0] === coitem).toBe(true)
 
-    remove(colist[3])
-    remove(colist[0])
+    remove((colist as any)[3])
+    remove((colist as any)[0])
 
     let list1 = read(colist)
 
