@@ -1,5 +1,6 @@
 # Welcome to costate 👋
 ![Version](https://img.shields.io/badge/version-0.0.1-blue.svg?cacheSeconds=2592000)
+[![Build Status](https://travis-ci.org/Lucifier129/costate.svg?branch=master)](https://travis-ci.org/Lucifier129/costate) 
 [![Documentation](https://img.shields.io/badge/documentation-yes-brightgreen.svg)](https://github.com/Lucifier129/costate#readme)
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/Lucifier129/costate/graphs/commit-activity)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Lucifier129/costate/blob/master/LICENSE)
