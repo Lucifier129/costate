@@ -1,1 +1,1 @@
-module.exports = require('../dist/lib/useCoreducer')
+module.exports = require('../dist/lib/useCoreducer').default

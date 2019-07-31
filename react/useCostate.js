@@ -1,1 +1,1 @@
-module.exports = require('../dist/lib/useCostate')
+module.exports = require('../dist/lib/useCostate').default
