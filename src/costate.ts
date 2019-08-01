@@ -9,26 +9,24 @@ export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
 export const hasCostate = (input: any) => !!(input && input[COSTATE])
 
-export const read = <T>(input: Costate<T> | T): T => {
+export const read = <T extends any[] | object = any>(input: T): T => {
   if (!isCostate(input)) return input
   return input[IMMUTABLE]()
 }
-
-export type Costate<T> = T & AsyncIterableIterator<T>
 
 type Key = string | number
 type Keys = Key[]
 
 type Connector = {
-  parents: Map<Costate<any>, Key | Keys>
+  parents: Map<any, Key | Keys>
   notify: () => void
-  connect: (child: Costate<any>, Key) => void
-  disconnect: (child: Costate<any>, Key) => void
+  connect: (child: any, Key) => void
+  disconnect: (child: any, Key) => void
   clear: () => void
 }
 
-const createConnector = <T = any>(proxy: Costate<T>): Connector => {
-  let parents = new Map<Costate<any>, Key | Keys>()
+const createConnector = <T = any>(proxy: T): Connector => {
+  let parents = new Map<any, Key | Keys>()
 
   let connect = (parent, key) => {
     if (!parents.has(parent)) {
@@ -111,9 +109,9 @@ const createConnector = <T = any>(proxy: Costate<T>): Connector => {
   }
 }
 
-const createImmutable = costate => {
+const createImmutable = <T extends any[] | object>(costate: T) => {
   let isArrayType = isArray(costate)
-  let immutableTarget = isArrayType ? [] : {}
+  let immutableTarget = (isArrayType ? [] : {}) as T
 
   let link = () => {
     Object.defineProperty(immutableTarget, COSTATE, {
@@ -133,14 +131,14 @@ const createImmutable = costate => {
     isDirty = false
 
     if (isArrayType) {
-      immutableTarget = []
-      for (let i = 0; i < costate.length; i++) {
+      immutableTarget = [] as T
+      for (let i = 0; i < (costate as any[]).length; i++) {
         immutableTarget[i] = read(costate[i])
       }
     } else {
-      immutableTarget = {}
+      immutableTarget = {} as T
       for (let key in costate) {
-        immutableTarget[key] = read(costate[key])
+        immutableTarget[key as string] = read(costate[key as string])
       }
     }
 
@@ -157,13 +155,13 @@ const createImmutable = costate => {
   }
 }
 
-const co = <T extends Array<any> | object>(state: T): Costate<T> => {
+const co = <T extends Array<any> | object>(state: T): T => {
   if (!isObject(state) && !isArray(state)) {
     throw new Error(`Expect state to be array or object, instead of ${state}`)
   }
 
-  if (isCostate(state)) return state as Costate<T>
-  if (state[COSTATE]) return state[COSTATE] as Costate<T>
+  if (isCostate(state)) return state
+  if (state[COSTATE]) return state[COSTATE] as T
 
   let isArrayType = isArray(state)
 
@@ -257,9 +255,9 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
     }
   }
 
-  let proxy = new Proxy(target, handlers) as Costate<T>
-  let connector = createConnector(proxy)
-  let immutable = createImmutable(proxy)
+  let proxy = new Proxy(target, handlers) as T
+  let connector = createConnector<T>(proxy)
+  let immutable = createImmutable<T>(proxy)
 
   // internal merging
   merge(proxy, state)
@@ -269,13 +267,10 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
 
 export default co
 
-type unwatch = () => void
-export type CostateWatcher<T> = (state: T) => void
+export type Unwatch = () => void
+export type Watcher<T> = (state: T) => void
 
-export const watch = <T extends any[] | object = any>(
-  costate: Costate<T>,
-  watcher: CostateWatcher<T>
-): unwatch => {
+export const watch = <T extends any[] | object = any>(costate: T, watcher: Watcher<T>): Unwatch => {
   if (!isCostate(costate)) {
     throw new Error(`Expected costate, but received ${costate}`)
   }
@@ -304,7 +299,7 @@ export const watch = <T extends any[] | object = any>(
   }
 }
 
-export const remove = <T extends any[] | object = any>(costate: Costate<T>): void => {
+export const remove = <T extends any[] | object = any>(costate: T): void => {
   if (!isCostate(costate)) {
     throw new Error(`Expected costate, but got ${costate}`)
   }

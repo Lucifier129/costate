@@ -4,7 +4,7 @@ import co, { watch, read, hasCostate } from './costate'
 const { useState, useEffect, useMemo } = React
 
 export default function useCostate<T extends any[] | object = any>(initialState: T): T {
-  let costate = useMemo(() => co(initialState), [])
+  let costate = useMemo(() => co<T>(initialState), [])
   let [_, setState] = useState<T>(() => read(costate))
 
   useEffect(() => {
