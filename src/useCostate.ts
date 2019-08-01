@@ -5,7 +5,7 @@ const { useState, useEffect, useMemo } = React
 
 export default function useCostate<T extends any[] | object = any>(initialState: T): T {
   let costate = useMemo(() => co(initialState), [])
-  let [state, setState] = useState<T>(() => read(costate))
+  let [_, setState] = useState<T>(() => read(costate))
 
   useEffect(() => {
     /**
@@ -16,5 +16,5 @@ export default function useCostate<T extends any[] | object = any>(initialState:
     return watch(costate, setState)
   }, [])
 
-  return state
+  return read(costate)
 }
