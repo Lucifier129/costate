@@ -36,96 +36,71 @@ describe('co', () => {
     }).toThrow()
   })
 
-  it('works correctly with object', done => {
+  it('works correctly with object', async done => {
     let costate = co({ count: 0 })
 
-    let comsumer = async () => {
-      let count = 0
-      for await (let state of costate) {
-        count += 1
-        expect(state.count).toEqual(count)
-        if (count >= 10) {
-          done()
-          return
-        }
+    let count = 0
+    let unwatch = watch(costate, state => {
+      count += 1
+      expect(state.count).toEqual(count)
+      if (count >= 10) {
+        unwatch()
+        done()
       }
-    }
+    })
 
-    let provider = async () => {
-      for (let i = 0; i < 10; i++) {
-        await delay()
-        costate.count += 1
-      }
+    for (let i = 0; i < 10; i++) {
+      await delay()
+      costate.count += 1
     }
-
-    // tslint:disable-next-line: no-floating-promises
-    comsumer()
-    // tslint:disable-next-line: no-floating-promises
-    provider()
   })
 
-  it('works correctly with array', done => {
+  it('works correctly with array', async done => {
     let colist = co([] as number[])
 
-    let comsumer = async () => {
-      let count = 0
-      for await (let list of colist) {
-        count += 1
-
-        for (let i = 0; i < count; i++) {
-          expect(list[i]).toBe(i)
-        }
-
-        if (count >= 10) {
-          done()
-          return
-        }
+    let count = 0
+    let unwatch = watch(colist, list => {
+      count += 1
+      for (let i = 0; i < count; i++) {
+        expect(list[i]).toBe(i)
       }
-    }
 
-    let provider = async () => {
-      for (let i = 0; i < 10; i++) {
-        await delay()
-        colist.push(i)
+      if (count >= 10) {
+        unwatch()
+        done()
+        return
       }
-    }
+    })
 
-    // tslint:disable-next-line: no-floating-promises
-    comsumer()
-    // tslint:disable-next-line: no-floating-promises
-    provider()
+    for (let i = 0; i < 10; i++) {
+      await delay()
+      colist.push(i)
+    }
   })
 
-  it('works correctly with nest structure', done => {
+  it('works correctly with nest structure', async done => {
     let costate = co({ counts: [] as number[] })
 
-    let comsumer = async () => {
-      let count = 0
-      for await (let state of costate) {
-        count += 1
+    let count = 0
 
-        for (let i = 0; i < count; i++) {
-          expect(state.counts[i]).toBe(i)
-        }
+    let unwatch = watch(costate, state => {
+      count += 1
 
-        if (count >= 10) {
-          done()
-          return
-        }
+      for (let i = 0; i < count; i++) {
+        expect(state.counts[i]).toBe(i)
       }
-    }
 
-    let provider = async () => {
-      for (let i = 0; i < 10; i++) {
-        await delay()
-        costate.counts.push(i)
+      if (count >= 10) {
+        unwatch()
+        done()
+        return
       }
-    }
+    })
 
-    // tslint:disable-next-line: no-floating-promises
-    comsumer()
-    // tslint:disable-next-line: no-floating-promises
-    provider()
+    for (let i = 0; i < 10; i++) {
+      await delay()
+      costate.counts.push(i)
+    }
   })
 
   it('can detect delete object property', done => {

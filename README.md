@@ -13,59 +13,33 @@
 
 ### 🏠 [Homepage](https://github.com/Lucifier129/costate#readme)
 
+## Features
+
+- mutate costate to derive the next immutable state reactively
+- write code in idiomatic javascript style
+- no need to centralize all of update-state/reducer function in React Component
+
+## Environment Requirement
+
+- ES2015 Proxy
+- ES0215 Map
+- ES2015 Symbol
+
+[Can I Use Proxy?](https://caniuse.com/#search=Proxy)
+
 ## Install
 
 ```sh
-npm install
+npm install --save costate
 ```
 
-## Motivation
-
-Below is immer
-
-```javascript
-import produce from 'immer'
-
-const baseState = [
-  {
-    todo: 'Learn typescript',
-    done: true
-  },
-  {
-    todo: 'Try immer',
-    done: false
-  }
-]
-
-// baseState and nextState is immutable
-// draftState is mutable
-const nextState = produce(baseState, draftState => {
-  draftState.push({ todo: 'Tweet about it' })
-  draftState[1].done = true
-})
+```sh
+yarn add costate
 ```
 
-Below is vue 3.0 reactivity api
+## [API DOCS](/docs/API.md)
 
-```javascript
-import { reactive, watch } from '@vue/observer'
-
-// obj is a reactive object
-const obj = reactive({ a: 1 })
-
-// watch with a getter function
-watch(
-  () => obj.a,
-  value => {
-    console.log(`obj.a is: ${value}`)
-  }
-)
-
-// mutate obj will trigger watcher
-obj.a += 1
-```
-
-Below is costate
+## Usage
 
 ```javascript
 import co, { watch } from 'costate'
@@ -82,11 +56,14 @@ watch(costate, state => {
 costate.a += 1
 ```
 
-Why costate is useful?
+## Why costate is useful?
 
 Think about **costate** + **react-hooks**!
 
-Counter [demo](https://lucifier129.github.io/costate-examples/build/#Counter) [source-code](https://github.com/Lucifier129/costate-examples/blob/master/src/demos/Counter.js)
+### Counter
+
+- [demo](https://lucifier129.github.io/costate-examples/build/#Counter)
+- [source-code](https://github.com/Lucifier129/costate-examples/blob/master/src/demos/Counter.js)
 
 ```javascript
 import * as React from 'react'
@@ -116,14 +93,6 @@ function Counter() {
   )
 }
 ```
-
-## Features
-
-- mutate costate to derive the next immutable state
-- no need to centralize all of update state function in Root Component
-- mutate state in idiomatic javascript style
-
-## Showcases
 
 ### TodoApp
 

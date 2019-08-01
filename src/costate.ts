@@ -5,8 +5,6 @@ const CONNECTOR = Symbol('CONNECTOR')
 const PROMISE = Symbol('PROMISE')
 const COSTATE = Symbol('COSTATE')
 
-const SymbolAsyncIterator = Symbol.asyncIterator
-
 export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
 
 export const hasCostate = (input: any) => !!(input && input[COSTATE])
@@ -194,10 +192,6 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
     consuming = false
   }
 
-  let asyncIterator = async function*() {
-    while (true) yield await proxy[PROMISE]
-  }
-
   let handlers: ProxyHandler<T> = {
     get(target, key, receiver) {
       if (key === IMMUTABLE) return immutable.compute
@@ -206,10 +200,6 @@ const co = <T extends Array<any> | object>(state: T): Costate<T> => {
       if (key === PROMISE) {
         consuming = true
         return deferred.promise
-      }
-
-      if (SymbolAsyncIterator && key === SymbolAsyncIterator) {
-        return asyncIterator
       }
 
       return Reflect.get(target, key, receiver)
