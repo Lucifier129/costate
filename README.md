@@ -120,7 +120,7 @@ export default function App() {
       return alert('empty content')
     }
 
-    // wrap by co before mutate
+    // wrap by co before mutating
     co(state).todos.push({
       id: Date.now(),
       content: state.text.value,
@@ -137,7 +137,7 @@ export default function App() {
 
   let handleToggleAll = () => {
     let hasActiveItem = state.todos.some(todo => !todo.completed)
-    // wrap by co before mutate
+    // wrap by co before mutating
     co(state).todos.forEach(todo => {
       todo.completed = hasActiveItem
     })
@@ -173,7 +173,7 @@ function Todo({ todo }) {
   let text = useCostate({ value: '' })
 
   let handleEdit = () => {
-    // wrap by co before mutate
+    // wrap by co before mutating
     co(edit).value = !edit.value
     co(text).value = todo.content
   }
@@ -182,7 +182,7 @@ function Todo({ todo }) {
     co(edit).value = false
     // magic happen!!
     // we don't need TodoApp to pass updateTodo function down to Todo
-    // we just like todo is local state, wrap by co before mutate it
+    // we just like todo is local state, wrap by co before mutating it
     // then it will cause TodoApp drived new state and re-render
     co(todo).content = text.value
   }
