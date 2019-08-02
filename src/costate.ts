@@ -52,13 +52,9 @@ const createConnector = <T = any>(costate: T) => {
     }
   }
 
-  let each = function*(current = parents) {
-    for (let [parent] of current) {
-      yield parent
-      let grandparents = parent[INTERNAL].parents
-      for (let grandparent of each(grandparents)) {
-        yield grandparent
-      }
+  let each = f => {
+    for (let [parent] of parents) {
+      f(parent)
     }
   }
 
@@ -121,13 +117,16 @@ const createImmutable = <T extends any[] | object>(costate: T) => {
 
     if (isArrayType) {
       immutableTarget = [] as T
+
       for (let i = 0; i < (costate as any[]).length; i++) {
         immutableTarget[i] = read(costate[i])
       }
     } else {
       immutableTarget = {} as T
+
       for (let key in costate) {
-        immutableTarget[key as string] = read(costate[key as string])
+        let value = read(costate[key as string])
+        immutableTarget[key as string] = value
       }
     }
 
@@ -143,18 +142,7 @@ const createImmutable = <T extends any[] | object>(costate: T) => {
     compute
   }
 }
-
-export type CoOptions = {
-  ReactHooks?: boolean
-}
-
-const defaults: CoOptions = {
-  ReactHooks: false
-}
-
-let costateId = 0
-
-const co = <T extends Array<any> | object>(state: T, options?: CoOptions): T => {
+const co = <T extends Array<any> | object>(state: T): T => {
   if (!isObject(state) && !isArray(state)) {
     throw new Error(`Expect state to be array or object, instead of ${state}`)
   }
@@ -162,57 +150,32 @@ const co = <T extends Array<any> | object>(state: T, options?: CoOptions): T => 
   if (isCostate(state)) return state
   if (state[COSTATE]) return state[COSTATE] as T
 
-  options = Object.assign({} as CoOptions, defaults, options)
-
-  let isReactHooks = options.ReactHooks
-
   let isArrayType = isArray(state)
 
   let target = isArrayType ? [] : {}
 
   let uid = 0
   let consuming = false
-
-  let normalNotify = () => {
-    immutable.mark()
-
-    if (consuming) {
-      // tslint:disable-next-line: no-floating-promises
-      Promise.resolve(++uid).then(doNotify) // debounced by promise
-    }
-
-    for (let parent of connector.each()) {
-      parent[INTERNAL].notify()
-    }
-  }
-
-  let notify = () => {
-    immutable.mark()
-
-    if (consuming) {
-      if (!isReactHooks) {
-        // tslint:disable-next-line: no-floating-promises
-        Promise.resolve(++uid).then(doNotify) // debounced by promise
-      }
-    }
-
-    let root = null
-
-    for (let parent of connector.each()) {
-      if (!root || root[INTERNAL].id > parent[INTERNAL].id) {
-        root = parent
-      }
-      parent[INTERNAL].mark()
-    }
-  }
-
   let deferred = createDeferred<T>()
 
-  let doNotify = (n: number) => {
+  let doResolve = (n: number) => {
     if (n !== uid) return
     deferred.resolve(read(proxy))
     deferred = createDeferred<T>()
     consuming = false
+  }
+
+  let notifyParent = parent => {
+    parent[INTERNAL].notify()
+  }
+
+  let notify = () => {
+    immutable.mark()
+    if (consuming) {
+      // tslint:disable-next-line: no-floating-promises
+      Promise.resolve(++uid).then(doResolve) // debounced by promise
+    }
+    connector.each(notifyParent)
   }
 
   let handlers: ProxyHandler<T> = {
@@ -226,7 +189,6 @@ const co = <T extends Array<any> | object>(state: T, options?: CoOptions): T => 
       if (typeof key === 'symbol') {
         return Reflect.set(target, key, value, receiver)
       }
-
       // list.push will trigger both index-key and length-key, ignore it
       if (isArrayType && key === 'length' && value === (target as Array<any>).length) {
         return true
@@ -277,15 +239,11 @@ const co = <T extends Array<any> | object>(state: T, options?: CoOptions): T => 
   let connector = createConnector<T>(proxy)
   let immutable = createImmutable<T>(proxy)
   let internal = {
-    id: costateId++,
     connect: connector.connect,
     disconnect: connector.disconnect,
     clear: connector.clear,
     compute: immutable.compute,
     mark: immutable.mark,
-    get parents() {
-      return connector.parents
-    },
     notify,
     get promise() {
       consuming = true
