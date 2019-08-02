@@ -15,15 +15,7 @@ export const read = <T extends any[] | object = any>(input: T): T => {
 type Key = string | number
 type Keys = Key[]
 
-type Connector = {
-  parents: Map<any, Key | Keys>
-  each: (f: (parent: any) => void) => void
-  connect: (child: any, Key) => void
-  disconnect: (child: any, Key) => void
-  clear: () => void
-}
-
-const createConnector = <T = any>(proxy: T): Connector => {
+const createConnector = <T = any>(costate: T) => {
   let parents = new Map<any, Key | Keys>()
 
   let connect = (parent, key) => {
@@ -60,15 +52,19 @@ const createConnector = <T = any>(proxy: T): Connector => {
     }
   }
 
-  let each = f => {
-    for (let [parent] of parents) {
-      f(parent)
+  let each = function*(current = parents) {
+    for (let [parent] of current) {
+      yield parent
+      let grandparents = parent[INTERNAL].parents
+      for (let grandparent of each(grandparents)) {
+        yield grandparent
+      }
     }
   }
 
   let remove = (parent, key) => {
     if (isArray(parent)) {
-      let index = parent.indexOf(proxy)
+      let index = parent.indexOf(costate)
       if (index !== -1) {
         parent.splice(index, 1)
       }
@@ -148,13 +144,27 @@ const createImmutable = <T extends any[] | object>(costate: T) => {
   }
 }
 
-const co = <T extends Array<any> | object>(state: T): T => {
+export type CoOptions = {
+  ReactHooks?: boolean
+}
+
+const defaults: CoOptions = {
+  ReactHooks: false
+}
+
+let costateId = 0
+
+const co = <T extends Array<any> | object>(state: T, options?: CoOptions): T => {
   if (!isObject(state) && !isArray(state)) {
     throw new Error(`Expect state to be array or object, instead of ${state}`)
   }
 
   if (isCostate(state)) return state
   if (state[COSTATE]) return state[COSTATE] as T
+
+  options = Object.assign({} as CoOptions, defaults, options)
+
+  let isReactHooks = options.ReactHooks
 
   let isArrayType = isArray(state)
 
@@ -163,17 +173,37 @@ const co = <T extends Array<any> | object>(state: T): T => {
   let uid = 0
   let consuming = false
 
-  let notifyParent = parent => {
-    parent[INTERNAL].notify()
-  }
-
-  let notify = () => {
+  let normalNotify = () => {
     immutable.mark()
+
     if (consuming) {
       // tslint:disable-next-line: no-floating-promises
       Promise.resolve(++uid).then(doNotify) // debounced by promise
     }
-    connector.each(notifyParent)
+
+    for (let parent of connector.each()) {
+      parent[INTERNAL].notify()
+    }
+  }
+
+  let notify = () => {
+    immutable.mark()
+
+    if (consuming) {
+      if (!isReactHooks) {
+        // tslint:disable-next-line: no-floating-promises
+        Promise.resolve(++uid).then(doNotify) // debounced by promise
+      }
+    }
+
+    let root = null
+
+    for (let parent of connector.each()) {
+      if (!root || root[INTERNAL].id > parent[INTERNAL].id) {
+        root = parent
+      }
+      parent[INTERNAL].mark()
+    }
   }
 
   let deferred = createDeferred<T>()
@@ -191,6 +221,7 @@ const co = <T extends Array<any> | object>(state: T): T => {
 
       return Reflect.get(target, key, receiver)
     },
+
     set(target, key, value, receiver) {
       if (typeof key === 'symbol') {
         return Reflect.set(target, key, value, receiver)
@@ -246,10 +277,15 @@ const co = <T extends Array<any> | object>(state: T): T => {
   let connector = createConnector<T>(proxy)
   let immutable = createImmutable<T>(proxy)
   let internal = {
+    id: costateId++,
     connect: connector.connect,
     disconnect: connector.disconnect,
     clear: connector.clear,
     compute: immutable.compute,
+    mark: immutable.mark,
+    get parents() {
+      return connector.parents
+    },
     notify,
     get promise() {
       consuming = true
