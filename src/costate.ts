@@ -1,17 +1,15 @@
 import { isArray, isObject, merge, createDeferred } from './util'
 
-const IMMUTABLE = Symbol('IMMUTABLE')
-const CONNECTOR = Symbol('CONNECTOR')
-const PROMISE = Symbol('PROMISE')
+const INTERNAL = Symbol('INTERNAL')
 const COSTATE = Symbol('COSTATE')
 
-export const isCostate = (input: any) => !!(input && input[IMMUTABLE])
+export const isCostate = (input: any) => !!(input && input[INTERNAL])
 
 export const hasCostate = (input: any) => !!(input && input[COSTATE])
 
 export const read = <T extends any[] | object = any>(input: T): T => {
   if (!isCostate(input)) return input
-  return input[IMMUTABLE]()
+  return input[INTERNAL].compute()
 }
 
 type Key = string | number
@@ -19,7 +17,7 @@ type Keys = Key[]
 
 type Connector = {
   parents: Map<any, Key | Keys>
-  notify: () => void
+  each: (f: (parent: any) => void) => void
   connect: (child: any, Key) => void
   disconnect: (child: any, Key) => void
   clear: () => void
@@ -62,16 +60,9 @@ const createConnector = <T = any>(proxy: T): Connector => {
     }
   }
 
-  let notify = () => {
-    for (let [parent, keys] of parents) {
-      if (!isArray(keys)) {
-        parent[keys] = proxy
-        continue
-      }
-
-      for (let key of keys) {
-        parent[key] = proxy
-      }
+  let each = f => {
+    for (let [parent] of parents) {
+      f(parent)
     }
   }
 
@@ -101,9 +92,9 @@ const createConnector = <T = any>(proxy: T): Connector => {
   }
 
   return {
+    each,
     parents,
     clear,
-    notify,
     connect,
     disconnect
   }
@@ -115,7 +106,9 @@ const createImmutable = <T extends any[] | object>(costate: T) => {
 
   let link = () => {
     Object.defineProperty(immutableTarget, COSTATE, {
-      get: () => costate
+      enumerable: false,
+      writable: false,
+      value: costate
     })
   }
 
@@ -170,15 +163,17 @@ const co = <T extends Array<any> | object>(state: T): T => {
   let uid = 0
   let consuming = false
 
+  let notifyParent = parent => {
+    parent[INTERNAL].notify()
+  }
+
   let notify = () => {
-    // notify the connected parents
-    connector.notify()
-
-    // not consuming, no need to resolve
-    if (!consuming) return
-
-    // tslint:disable-next-line: no-floating-promises
-    Promise.resolve(++uid).then(doNotify) // debounced by promise
+    immutable.mark()
+    if (consuming) {
+      // tslint:disable-next-line: no-floating-promises
+      Promise.resolve(++uid).then(doNotify) // debounced by promise
+    }
+    connector.each(notifyParent)
   }
 
   let deferred = createDeferred<T>()
@@ -192,13 +187,7 @@ const co = <T extends Array<any> | object>(state: T): T => {
 
   let handlers: ProxyHandler<T> = {
     get(target, key, receiver) {
-      if (key === IMMUTABLE) return immutable.compute
-      if (key === CONNECTOR) return connector
-
-      if (key === PROMISE) {
-        consuming = true
-        return deferred.promise
-      }
+      if (key === INTERNAL) return internal
 
       return Reflect.get(target, key, receiver)
     },
@@ -219,15 +208,14 @@ const co = <T extends Array<any> | object>(state: T): T => {
       }
 
       if (isCostate(value)) {
-        value[CONNECTOR].connect(proxy, key)
+        value[INTERNAL].connect(proxy, key)
       }
 
-      immutable.mark()
       Reflect.set(target, key, value, receiver)
 
       // disconnnect prev child
       if (value !== prevValue && isCostate(prevValue)) {
-        prevValue[CONNECTOR].disconnect(proxy, key)
+        prevValue[INTERNAL].disconnect(proxy, key)
       }
 
       notify()
@@ -243,10 +231,9 @@ const co = <T extends Array<any> | object>(state: T): T => {
       let value = target[key]
 
       if (isCostate(value)) {
-        value[CONNECTOR].disconnect(proxy, key)
+        value[INTERNAL].disconnect(proxy, key)
       }
 
-      immutable.mark()
       Reflect.deleteProperty(target, key)
 
       notify()
@@ -258,8 +245,18 @@ const co = <T extends Array<any> | object>(state: T): T => {
   let proxy = new Proxy(target, handlers) as T
   let connector = createConnector<T>(proxy)
   let immutable = createImmutable<T>(proxy)
+  let internal = {
+    connect: connector.connect,
+    disconnect: connector.disconnect,
+    clear: connector.clear,
+    compute: immutable.compute,
+    notify,
+    get promise() {
+      consuming = true
+      return deferred.promise
+    }
+  }
 
-  // internal merging
   merge(proxy, state)
 
   return proxy
@@ -289,7 +286,7 @@ export const watch = <T extends any[] | object = any>(costate: T, watcher: Watch
 
   let f = () => {
     if (unwatched) return
-    costate[PROMISE].then(consume)
+    costate[INTERNAL].promise.then(consume)
   }
 
   f()
@@ -303,5 +300,5 @@ export const remove = <T extends any[] | object = any>(costate: T): void => {
   if (!isCostate(costate)) {
     throw new Error(`Expected costate, but got ${costate}`)
   }
-  costate[CONNECTOR].clear()
+  costate[INTERNAL].clear()
 }
