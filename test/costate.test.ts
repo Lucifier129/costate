@@ -118,6 +118,22 @@ describe('co', () => {
     expect(costate.hasOwnProperty('b')).toBe(false)
   })
 
+  it('should disconnect array item correctly', done => {
+    let colist = co([{ value: 1 }, { value: 2 }, { value: 3 }])
+    let covalue0 = colist[0]
+
+    colist.length = 0
+
+    watch(colist, list => {
+      console.log('list', list)
+      throw new Error('disconnect failed')
+    })
+
+    covalue0.value += 1
+
+    setTimeout(() => done(), 4)
+  })
+
   it('can detect delete array item', () => {
     let colist = co([1, 2, 3])
     let list0 = read(colist)

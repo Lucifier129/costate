@@ -190,8 +190,19 @@ const co = <T extends Array<any> | object>(state: T): T => {
         return Reflect.set(target, key, value, receiver)
       }
       // list.push will trigger both index-key and length-key, ignore it
-      if (isArrayType && key === 'length' && value === (target as Array<any>).length) {
-        return true
+      if (isArrayType && key === 'length') {
+        let length = (target as any[]).length
+        if (value === length) {
+          return true
+        } else if (value < length) {
+          // disconnect coitem when set array.length
+          for (let i = value; i < length; i++) {
+            let item = target[i]
+            if (isCostate(item)) {
+              item[INTERNAL].disconnect(proxy, i)
+            }
+          }
+        }
       }
 
       let prevValue = target[key]
