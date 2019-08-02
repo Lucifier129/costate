@@ -189,18 +189,18 @@ const co = <T extends Array<any> | object>(state: T): T => {
       if (typeof key === 'symbol') {
         return Reflect.set(target, key, value, receiver)
       }
+
       // list.push will trigger both index-key and length-key, ignore it
       if (isArrayType && key === 'length') {
         let length = (target as any[]).length
-        if (value === length) {
-          return true
-        } else if (value < length) {
+
+        if (value === length) return true
+
+        if (value < length) {
           // disconnect coitem when set array.length
           for (let i = value; i < length; i++) {
             let item = target[i]
-            if (isCostate(item)) {
-              item[INTERNAL].disconnect(proxy, i)
-            }
+            if (isCostate(item)) item[INTERNAL].disconnect(proxy, i)
           }
         }
       }
@@ -217,7 +217,7 @@ const co = <T extends Array<any> | object>(state: T): T => {
 
       Reflect.set(target, key, value, receiver)
 
-      // disconnnect prev child
+      // disconnect prev child
       if (value !== prevValue && isCostate(prevValue)) {
         prevValue[INTERNAL].disconnect(proxy, key)
       }
