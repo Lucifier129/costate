@@ -1,9 +1,9 @@
 import 'jest'
-import { co } from '../src'
-import useCostate from '../src/useCostate'
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import { act } from 'react-dom/test-utils'
+import { co } from '../src'
+import { useCostate } from '../src/react'
 
 const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 

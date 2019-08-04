@@ -1,8 +1,8 @@
 import 'jest'
-import useCoreducer from '../src/useCoreducer'
 import React from 'react'
 import ReactDOM from 'react-dom'
 import { act } from 'react-dom/test-utils'
+import { useCoreducer } from '../src/react'
 
 const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 

@@ -1,5 +1,5 @@
 import 'jest'
-import createCostate, { watch, getState, remove, hasCostate, isCostate } from '../src'
+import { createCostate, watch, getState, remove, hasCostate, isCostate } from '../src'
 
 const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 

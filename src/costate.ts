@@ -102,7 +102,7 @@ const createImmutable = <T extends any[] | object>(costate: T) => {
   }
 }
 
-const createCostate = <T extends Source>(state: T): T => {
+export const createCostate = <T extends Source>(state: T): T => {
   if (!isObject(state) && !isArray(state)) {
     let message = `Expect state to be array or object, instead of ${state}`
     throw new Error(message)
@@ -250,8 +250,6 @@ const createCostate = <T extends Source>(state: T): T => {
 
   return costate
 }
-
-export default createCostate
 
 export type Unwatch = () => void
 export type Watcher<T> = (state: T) => void

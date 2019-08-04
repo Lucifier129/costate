@@ -1,5 +1,5 @@
 import React from 'react'
-import createCostate, { watch, getState, Source } from './costate'
+import { createCostate, watch, getState, Source } from '../costate'
 
 const { useState, useEffect, useMemo } = React
 

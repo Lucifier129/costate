@@ -1,5 +1,5 @@
 import React, { Dispatch } from 'react'
-import { co, Source } from './costate'
+import { co, Source } from '../costate'
 import useCostate from './useCostate'
 
 const { useRef, useCallback, useEffect } = React
