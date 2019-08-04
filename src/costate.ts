@@ -128,7 +128,7 @@ const createCostate = <T extends Source>(state: T): T => {
   }
 
   let remove = () => {
-    if (!connection.parent) return
+    if (!connection.parent) return false
 
     let { parent, key } = connection
 
@@ -138,6 +138,8 @@ const createCostate = <T extends Source>(state: T): T => {
     } else {
       delete parent[key]
     }
+
+    return true
   }
 
   let uid = 0
@@ -146,7 +148,7 @@ const createCostate = <T extends Source>(state: T): T => {
 
   let doResolve = (n: number) => {
     if (n !== uid) return
-    deferred.resolve(getState(costate) as T)
+    deferred.resolve(getState(costate))
     deferred = createDeferred<T>()
     consuming = false
   }
@@ -158,6 +160,7 @@ const createCostate = <T extends Source>(state: T): T => {
       // tslint:disable-next-line: no-floating-promises
       Promise.resolve(++uid).then(doResolve) // debounced by promise
     }
+
     if (connection.parent) {
       connection.parent[INTERNAL].notify()
     }
@@ -230,7 +233,7 @@ const createCostate = <T extends Source>(state: T): T => {
   }
 
   let costate = new Proxy(target, handlers) as T
-  let immutable = createImmutable<T>(costate)
+  let immutable = createImmutable(costate)
   let internal = {
     compute: immutable.compute,
     connect,
@@ -282,9 +285,9 @@ export const watch = <T extends any[] | object = any>(costate: T, watcher: Watch
   }
 }
 
-export const remove = <T extends any[] | object = any>(costate: T): void => {
+export const remove = <T extends any[] | object = any>(costate: T): boolean => {
   if (!isCostate(costate)) {
     throw new Error(`Expected costate, but got ${costate}`)
   }
-  costate[INTERNAL].remove()
+  return costate[INTERNAL].remove()
 }
