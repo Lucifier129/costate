@@ -3,93 +3,33 @@ import { isArray, isObject, merge, createDeferred } from './util'
 const INTERNAL = Symbol('INTERNAL')
 const COSTATE = Symbol('COSTATE')
 
-export const isCostate = (input: any) => !!(input && input[INTERNAL])
+export const isCostate = (input: any): boolean => {
+  return !!(input && input[INTERNAL])
+}
 
 export const hasCostate = (input: any) => !!(input && input[COSTATE])
 
-export const read = <T extends any[] | object = any>(input: T): T => {
-  if (!isCostate(input)) return input
+export type Source = any[] | object
+
+export const getState = <T extends Source>(input: T): T => {
+  if (!isCostate(input)) {
+    throw new Error(`Expect ${input} to be a costate`)
+  }
   return input[INTERNAL].compute()
 }
 
-type Key = string | number
-type Keys = Key[]
-
-const createConnector = <T = any>(costate: T) => {
-  let parents = new Map<any, Key | Keys>()
-
-  let connect = (parent, key) => {
-    if (!parents.has(parent)) {
-      parents.set(parent, key)
-      return
-    }
-
-    let keys = parents.get(parent)
-
-    if (keys === key) return
-
-    if (!isArray(keys)) {
-      keys = [keys]
-    }
-
-    if (!keys.includes(key)) {
-      keys.push(key)
-    }
-
-    parents.set(parent, keys)
+export const getCostate = <T extends Source>(input: T): T => {
+  if (!hasCostate(input)) {
+    throw new Error(`${input} has no corresponding costate`)
   }
+  return input[COSTATE]
+}
 
-  let disconnect = (parent, key) => {
-    let keys = parents.get(parent)
+export const co = <T extends Source>(input: T) => {
+  if (isCostate(input)) return getState(input)
+  if (hasCostate(input)) return getCostate(input)
 
-    if (keys == null) return
-
-    if (!isArray(keys) || keys.length === 1) {
-      parents.delete(parent)
-    } else {
-      let index = keys.indexOf(key)
-      keys.splice(index, 1)
-    }
-  }
-
-  let each = f => {
-    for (let [parent] of parents) {
-      f(parent)
-    }
-  }
-
-  let remove = (parent, key) => {
-    if (isArray(parent)) {
-      let index = parent.indexOf(costate)
-      if (index !== -1) {
-        parent.splice(index, 1)
-      }
-    } else {
-      delete parent[key]
-    }
-  }
-
-  let clear = () => {
-    for (let [parent, keys] of parents) {
-      if (!isArray(keys)) {
-        remove(parent, keys)
-        continue
-      }
-
-      // remove will cause mutable keys, copy to make sure for-of work expectly
-      for (let key of [...keys]) {
-        remove(parent, key)
-      }
-    }
-  }
-
-  return {
-    each,
-    parents,
-    clear,
-    connect,
-    disconnect
-  }
+  throw new Error(`${input} is not costate or has corresponding costate`)
 }
 
 const createImmutable = <T extends any[] | object>(costate: T) => {
@@ -110,24 +50,43 @@ const createImmutable = <T extends any[] | object>(costate: T) => {
     isDirty = true
   }
 
+  let computeArray = () => {
+    immutableTarget = [] as T
+
+    for (let i = 0; i < (costate as any[]).length; i++) {
+      let item = costate[i]
+
+      if (isCostate(item)) {
+        immutableTarget[i] = getState(item)
+      } else {
+        immutableTarget[i] = item
+      }
+    }
+  }
+
+  let computeObject = () => {
+    immutableTarget = {} as T
+
+    for (let key in costate) {
+      let value = costate[key as string]
+
+      if (isCostate(value)) {
+        immutableTarget[key as string] = getState(value)
+      } else {
+        immutableTarget[key as string] = value
+      }
+    }
+  }
+
   let compute = () => {
     if (!isDirty) return immutableTarget
 
     isDirty = false
 
     if (isArrayType) {
-      immutableTarget = [] as T
-
-      for (let i = 0; i < (costate as any[]).length; i++) {
-        immutableTarget[i] = read(costate[i])
-      }
+      computeArray()
     } else {
-      immutableTarget = {} as T
-
-      for (let key in costate) {
-        let value = read(costate[key as string])
-        immutableTarget[key as string] = value
-      }
+      computeObject()
     }
 
     link()
@@ -142,17 +101,44 @@ const createImmutable = <T extends any[] | object>(costate: T) => {
     compute
   }
 }
-const co = <T extends Array<any> | object>(state: T): T => {
-  if (!isObject(state) && !isArray(state)) {
-    throw new Error(`Expect state to be array or object, instead of ${state}`)
-  }
 
-  if (isCostate(state)) return state
-  if (state[COSTATE]) return state[COSTATE] as T
+const createCostate = <T extends Source>(state: T): T => {
+  if (!isObject(state) && !isArray(state)) {
+    let message = `Expect state to be array or object, instead of ${state}`
+    throw new Error(message)
+  }
 
   let isArrayType = isArray(state)
 
   let target = isArrayType ? [] : {}
+
+  let connection = {
+    parent: null,
+    key: null
+  }
+
+  let connect = (parent, key) => {
+    connection.parent = parent
+    connection.key = key
+  }
+
+  let disconnect = () => {
+    connection.parent = null
+    connection.key = null
+  }
+
+  let remove = () => {
+    if (!connection.parent) return
+
+    let { parent, key } = connection
+
+    if (isArray(parent)) {
+      let index = parent.indexOf(costate)
+      parent.splice(index, 1)
+    } else {
+      delete parent[key]
+    }
+  }
 
   let uid = 0
   let consuming = false
@@ -160,22 +146,21 @@ const co = <T extends Array<any> | object>(state: T): T => {
 
   let doResolve = (n: number) => {
     if (n !== uid) return
-    deferred.resolve(read(proxy))
+    deferred.resolve(getState(costate) as T)
     deferred = createDeferred<T>()
     consuming = false
   }
 
-  let notifyParent = parent => {
-    parent[INTERNAL].notify()
-  }
-
   let notify = () => {
     immutable.mark()
+
     if (consuming) {
       // tslint:disable-next-line: no-floating-promises
       Promise.resolve(++uid).then(doResolve) // debounced by promise
     }
-    connector.each(notifyParent)
+    if (connection.parent) {
+      connection.parent[INTERNAL].notify()
+    }
   }
 
   let handlers: ProxyHandler<T> = {
@@ -186,41 +171,39 @@ const co = <T extends Array<any> | object>(state: T): T => {
     },
 
     set(target, key, value, receiver) {
+      let prevValue = target[key]
+
+      if (prevValue === value) return true
+
       if (typeof key === 'symbol') {
         return Reflect.set(target, key, value, receiver)
       }
 
-      // list.push will trigger both index-key and length-key, ignore it
-      if (isArrayType && key === 'length') {
-        let length = (target as any[]).length
-
-        if (value === length) return true
-
-        if (value < length) {
-          // disconnect coitem when set array.length
-          for (let i = value; i < length; i++) {
-            let item = target[i]
-            if (isCostate(item)) item[INTERNAL].disconnect(proxy, i)
+      if (isArrayType && key === 'length' && value < (target as any[]).length) {
+        // disconnect coitem when reduce array.length
+        for (let i = value; i < (target as any[]).length; i++) {
+          let item = target[i]
+          if (isCostate(item)) {
+            item[INTERNAL].disconnect()
           }
         }
       }
 
-      let prevValue = target[key]
-
       if (isObject(value) || isArray(value)) {
-        value = co(value)
+        value = createCostate(value)
       }
 
+      // connect current value
       if (isCostate(value)) {
-        value[INTERNAL].connect(proxy, key)
+        value[INTERNAL].connect(costate, key)
+      }
+
+      // disconnect previous value
+      if (isCostate(prevValue)) {
+        prevValue[INTERNAL].disconnect()
       }
 
       Reflect.set(target, key, value, receiver)
-
-      // disconnect prev child
-      if (value !== prevValue && isCostate(prevValue)) {
-        prevValue[INTERNAL].disconnect(proxy, key)
-      }
 
       notify()
 
@@ -235,7 +218,7 @@ const co = <T extends Array<any> | object>(state: T): T => {
       let value = target[key]
 
       if (isCostate(value)) {
-        value[INTERNAL].disconnect(proxy, key)
+        value[INTERNAL].disconnect()
       }
 
       Reflect.deleteProperty(target, key)
@@ -246,28 +229,26 @@ const co = <T extends Array<any> | object>(state: T): T => {
     }
   }
 
-  let proxy = new Proxy(target, handlers) as T
-  let connector = createConnector<T>(proxy)
-  let immutable = createImmutable<T>(proxy)
+  let costate = new Proxy(target, handlers) as T
+  let immutable = createImmutable<T>(costate)
   let internal = {
-    connect: connector.connect,
-    disconnect: connector.disconnect,
-    clear: connector.clear,
     compute: immutable.compute,
-    mark: immutable.mark,
+    connect,
+    disconnect,
     notify,
+    remove,
     get promise() {
       consuming = true
       return deferred.promise
     }
   }
 
-  merge(proxy, state)
+  merge(costate, state)
 
-  return proxy
+  return costate
 }
 
-export default co
+export default createCostate
 
 export type Unwatch = () => void
 export type Watcher<T> = (state: T) => void
@@ -305,5 +286,5 @@ export const remove = <T extends any[] | object = any>(costate: T): void => {
   if (!isCostate(costate)) {
     throw new Error(`Expected costate, but got ${costate}`)
   }
-  costate[INTERNAL].clear()
+  costate[INTERNAL].remove()
 }

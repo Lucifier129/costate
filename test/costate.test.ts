@@ -1,11 +1,11 @@
 import 'jest'
-import co, { watch, read, remove, hasCostate, isCostate } from '../src'
+import createCostate, { watch, getState, remove, hasCostate, isCostate } from '../src'
 
 const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 
-describe('co', () => {
+describe('createCostate', () => {
   it('can be watched and unwatched', done => {
-    let costate = co({ count: 0 })
+    let costate = createCostate({ count: 0 })
 
     let i = 0
 
@@ -37,7 +37,7 @@ describe('co', () => {
   })
 
   it('works correctly with object', async done => {
-    let costate = co({ count: 0 })
+    let costate = createCostate({ count: 0 })
 
     let count = 0
     let unwatch = watch(costate, state => {
@@ -56,7 +56,7 @@ describe('co', () => {
   })
 
   it('works correctly with array', async done => {
-    let colist = co([] as number[])
+    let colist = createCostate([] as number[])
 
     let count = 0
     let unwatch = watch(colist, list => {
@@ -79,7 +79,7 @@ describe('co', () => {
   })
 
   it('works correctly with nest structure', async done => {
-    let costate = co({ counts: [] as number[] })
+    let costate = createCostate({ counts: [] as number[] })
 
     let count = 0
 
@@ -104,7 +104,7 @@ describe('co', () => {
   })
 
   it('can detect delete object property', done => {
-    let costate = co({ a: 1, b: 2 })
+    let costate = createCostate({ a: 1, b: 2 })
 
     watch(costate, state => {
       expect(state.hasOwnProperty('b')).toBe(false)
@@ -119,7 +119,7 @@ describe('co', () => {
   })
 
   it('should disconnect array item correctly', done => {
-    let colist = co([{ value: 1 }, { value: 2 }, { value: 3 }])
+    let colist = createCostate([{ value: 1 }, { value: 2 }, { value: 3 }])
     let covalue0 = colist[0]
 
     colist.length = 0
@@ -135,62 +135,70 @@ describe('co', () => {
   })
 
   it('can detect delete array item', () => {
-    let colist = co([1, 2, 3])
-    let list0 = read(colist)
+    let colist = createCostate([1, 2, 3])
+    let list0 = getState(colist)
 
     colist.splice(1, 1)
 
-    let list1 = read(colist)
+    let list1 = getState(colist)
 
     expect(list0).toEqual([1, 2, 3])
     expect(list1).toEqual([1, 3])
   })
 
-  it('supports multiple keys has the same costate', () => {
-    let cochild = co({ a: 1, b: 2 })
-    let coparent = co({ child1: cochild, child2: cochild })
+  it('should not reuse costate', () => {
+    let cochild = createCostate({ a: 1, b: 2 })
+    let coparent = createCostate({ child1: cochild, child2: cochild })
 
     cochild.b -= 1
 
-    let state = read(coparent)
+    expect(getState(cochild)).toEqual({
+      a: 1,
+      b: 1
+    })
 
-    expect(state.child1 === state.child2).toBe(true)
+    let state = getState(coparent)
+
+    expect(createCostate(state) === coparent).toBe(false)
+
+    expect(state.child1 === state.child2).toBe(false)
+
     expect(state).toEqual({
       child1: {
         a: 1,
-        b: 1
+        b: 2
       },
       child2: {
         a: 1,
-        b: 1
+        b: 2
       }
     })
 
     delete coparent.child1
 
-    let state1 = read(coparent)
+    let state1 = getState(coparent)
 
     expect(state1).toEqual({
       child2: {
         a: 1,
-        b: 1
+        b: 2
       }
     })
 
-    cochild.a += 1
+    coparent.child2.a += 1
 
-    let state2 = read(coparent)
+    let state2 = getState(coparent)
 
     expect(state2).toEqual({
       child2: {
         a: 2,
-        b: 1
+        b: 2
       }
     })
   })
 
   it('should support debounce', done => {
-    let costate = co({ count: 0 })
+    let costate = createCostate({ count: 0 })
 
     watch(costate, state => {
       expect(state.count).toBe(10)
@@ -202,9 +210,9 @@ describe('co', () => {
     }
   })
 
-  it('can be read and detect', () => {
-    let costate = co({ count: 0 })
-    let state = read(costate)
+  it('can be getState and detect', () => {
+    let costate = createCostate({ count: 0 })
+    let state = getState(costate)
 
     expect(isCostate(costate)).toBe(true)
     expect(isCostate({ count: 0 })).toBe(false)
@@ -213,22 +221,20 @@ describe('co', () => {
     expect(hasCostate({ count: 0 })).toBe(false)
 
     expect(state).toEqual({ count: 0 })
-
-    expect(co(state) === costate).toBe(true)
   })
 
   it('object state derived by costate should be immutable', () => {
-    let costate = co({ a: { value: 1 }, b: { value: 1 }, c: { value: 1 } })
-    let state0 = read(costate)
+    let costate = createCostate({ a: { value: 1 }, b: { value: 1 }, c: { value: 1 } })
+    let state0 = getState(costate)
 
     costate.a.value += 1
-    let state1 = read(costate)
+    let state1 = getState(costate)
 
     costate.b.value += 1
-    let state2 = read(costate)
+    let state2 = getState(costate)
 
     costate.c.value += 1
-    let state3 = read(costate)
+    let state3 = getState(costate)
 
     expect(state0 !== state1).toBe(true)
     expect(state0 !== state2).toBe(true)
@@ -256,17 +262,17 @@ describe('co', () => {
   })
 
   it('list state derived by costate should be immutable', () => {
-    let colist = co([{ value: 1 }, { value: 1 }, { value: 1 }])
-    let list0 = read(colist)
+    let colist = createCostate([{ value: 1 }, { value: 1 }, { value: 1 }])
+    let list0 = getState(colist)
 
     colist[0].value += 1
-    let list1 = read(colist)
+    let list1 = getState(colist)
 
     colist[1].value += 1
-    let list2 = read(colist)
+    let list2 = getState(colist)
 
     colist[2].value += 1
-    let list3 = read(colist)
+    let list3 = getState(colist)
 
     expect(list0 !== list1).toBe(true)
     expect(list0 !== list2).toBe(true)
@@ -293,7 +299,7 @@ describe('co', () => {
     expect(list3).toEqual([{ value: 2 }, { value: 2 }, { value: 2 }])
 
     colist.push({ value: 1 })
-    let list4 = read(colist)
+    let list4 = getState(colist)
 
     expect(list4 !== list3).toBe(true)
     expect(list4[0] === list3[0]).toBe(true)
@@ -304,7 +310,7 @@ describe('co', () => {
     expect(list4).toEqual([{ value: 2 }, { value: 2 }, { value: 2 }, { value: 1 }])
 
     colist.pop()
-    let list5 = read(colist)
+    let list5 = getState(colist)
 
     expect(list5 !== list3).toBe(true)
     expect(list5[0] === list3[0]).toBe(true)
@@ -318,34 +324,34 @@ describe('co', () => {
   it('should ignore the change of symbol key', () => {
     let symbol0: any = Symbol('0')
     let symbol1: any = Symbol('1')
-    let costate = co({ count: 1, [symbol0]: 1, [symbol1]: 1 })
-    let state0 = read(costate)
+    let costate = createCostate({ count: 1, [symbol0]: 1, [symbol1]: 1 })
+    let state0 = getState(costate)
 
     costate[symbol0] += 1
 
-    let state1 = read(costate)
+    let state1 = getState(costate)
 
     expect(state0 === state1).toBe(true)
 
     delete costate[symbol1]
 
-    let state2 = read(costate)
+    let state2 = getState(costate)
 
     expect(state0 === state2).toBe(true)
   })
 
   it('should throw error if the arg passing to co is not object or array', () => {
     expect(() => {
-      co(() => 1)
+      createCostate(() => 1)
     }).toThrow()
   })
 
   it('should disconnect correctly', () => {
-    let costate = co({ a: { value: 1 }, b: { value: 2 } })
+    let costate = createCostate({ a: { value: 1 }, b: { value: 2 } })
 
     costate.a.value += 1
 
-    let state1 = read(costate)
+    let state1 = getState(costate)
 
     expect(state1.a.value).toBe(2)
 
@@ -353,60 +359,57 @@ describe('co', () => {
 
     costate.a = { value: 1 }
 
-    let state2 = read(costate)
+    let state2 = getState(costate)
 
     expect(state2.a.value).toBe(1)
 
     oldA.value += 1
 
-    expect(read(oldA)).toEqual({ value: 3 })
+    expect(getState(oldA)).toEqual({ value: 3 })
 
-    let state3 = read(costate)
+    let state3 = getState(costate)
 
     expect(state3.a).toEqual({ value: 1 })
   })
 
   it('costate object can be removed', done => {
-    let cochild = co({ value: 1 })
-    let costate = co({ a: cochild, b: { value: 2 }, c: cochild, d: { value: 3 } })
-    let state0 = read(costate)
+    let costate = createCostate({
+      a: { value: 1 },
+      b: { value: 2 },
+      c: { value: 3 },
+      d: { value: 4 }
+    })
+    let state0 = getState(costate)
 
     watch(costate, state => {
       expect(state === state1).toBe(true)
       done()
     })
 
-    expect(costate.a === costate.c).toBe(true)
-    expect(costate.a === cochild).toBe(true)
-
     remove(costate.a)
-    remove((costate as any).d)
+    remove(costate.c)
 
-    let state1 = read(costate)
+    let state1 = getState(costate)
 
-    expect(state0).toEqual({ a: { value: 1 }, b: { value: 2 }, c: { value: 1 }, d: { value: 3 } })
-    expect(state1).toEqual({ b: { value: 2 } })
+    expect(state0).toEqual({ a: { value: 1 }, b: { value: 2 }, c: { value: 3 }, d: { value: 4 } })
+    expect(state1).toEqual({ b: { value: 2 }, d: { value: 4 } })
   })
 
   it('costate array can be removed', done => {
-    let coitem = co({ value: 1 })
-    let colist = co([coitem, { value: 2 }, coitem, { value: 3 }])
-    let list0 = read(colist)
+    let colist = createCostate([{ value: 1 }, { value: 2 }, { value: 3 }, { value: 4 }])
+    let list0 = getState(colist)
 
     watch(colist, list => {
       expect(list === list1).toBe(true)
       done()
     })
 
-    expect(colist[0] === colist[2]).toBe(true)
-    expect(colist[0] === coitem).toBe(true)
+    remove(colist[3])
+    remove(colist[0])
 
-    remove((colist as any)[3])
-    remove((colist as any)[0])
+    let list1 = getState(colist)
 
-    let list1 = read(colist)
-
-    expect(list0).toEqual([{ value: 1 }, { value: 2 }, { value: 1 }, { value: 3 }])
-    expect(list1).toEqual([{ value: 2 }])
+    expect(list0).toEqual([{ value: 1 }, { value: 2 }, { value: 3 }, { value: 4 }])
+    expect(list1).toEqual([{ value: 2 }, { value: 3 }])
   })
 })

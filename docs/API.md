@@ -2,17 +2,29 @@
 
 ## Basic API
 
-### co(state) => costate
+```javascript
+import createCostate, { co, read, watch, isCostate, hasCostate, remove } from 'costate'
+import { useCostate, useCoreducer } from 'costate'
+```
+
+### createCostate(state) => costate
 
 create co-state by state
 
-### watch(costate, watcher: state => void) => unwatch
-
-watch a co-state, watcher function will receive state when co-state changed
-
-### read(costate) => state
+### getState(costate) => state
 
 read the latest state from co-state
+
+### getCostate(state) => costate
+
+retrive costate from state derived by costate
+
+### co(arg) => costate | state
+
+combined getState and getCostate
+
+- if `arg` is state, return costate
+- if `arg` is costate, return state
 
 ### isCostate(arg) => boolean
 
@@ -21,6 +33,10 @@ check if `arg` is a co-state or not
 ### hasCostate(state) => boolean
 
 check if `state` has corresponding co-state or not
+
+### watch(costate, watcher: state => void) => unwatch
+
+watch a co-state, watcher function will receive state when co-state changed
 
 ### remove(costate) => void
 

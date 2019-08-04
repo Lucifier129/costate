@@ -1,5 +1,5 @@
 import 'jest'
-import co from '../src'
+import { co } from '../src'
 import useCostate from '../src/useCostate'
 import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom'

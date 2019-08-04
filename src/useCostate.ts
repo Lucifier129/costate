@@ -1,20 +1,23 @@
 import React from 'react'
-import co, { watch, read, hasCostate } from './costate'
+import createCostate, { watch, getState, Source } from './costate'
 
 const { useState, useEffect, useMemo } = React
 
-export default function useCostate<T extends any[] | object = any>(initialState: T): T {
-  let costate = useMemo(() => co<T>(initialState), [])
-  let [_, setState] = useState<T>(() => read(costate))
+type GetInitialState<T> = () => T
 
-  useEffect(() => {
-    /**
-     * if initialState is linked a costate, no need to watch it
-     * it must be watched by parent or another useCostate in function-component
-     */
-    if (hasCostate(initialState)) return
-    return watch(costate, setState)
-  }, [])
+type InitialState<T> = GetInitialState<T> | T
 
-  return read(costate)
+export default function useCostate<T extends Source = any>(initialState: InitialState<T>): T {
+  let costate = useMemo(
+    () =>
+      createCostate(
+        typeof initialState === 'function' ? (initialState as GetInitialState<T>)() : initialState
+      ),
+    []
+  )
+  let [state, setState] = useState<T>(() => getState(costate))
+
+  useEffect(() => watch(costate, setState), [])
+
+  return state
 }

@@ -1,10 +1,10 @@
 import React, { Dispatch } from 'react'
-import co from './costate'
+import { co, Source } from './costate'
 import useCostate from './useCostate'
 
 const { useRef, useCallback, useEffect } = React
 
-export default function useCoreducer<State extends any[] | object, Action>(
+export default function useCoreducer<State extends Source = any, Action = any>(
   coreducer: (costate: State, action: Action) => void,
   initialState: State
 ): [State, Dispatch<Action>] {

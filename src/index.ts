@@ -1,9 +1,20 @@
-import co from './costate'
+import createCostate from './costate'
 import useCostate from './useCostate'
 import useCoreducer from './useCoreducer'
 
-export { read, watch, hasCostate, remove, isCostate, Watcher, Unwatch } from './costate'
+export {
+  co,
+  getState,
+  getCostate,
+  isCostate,
+  hasCostate,
+  watch,
+  remove,
+  Source,
+  Watcher,
+  Unwatch
+} from './costate'
 
 export { useCostate, useCoreducer }
 
-export default co
+export default createCostate

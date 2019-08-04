@@ -42,10 +42,10 @@ yarn add costate
 ## Usage
 
 ```javascript
-import co, { watch } from 'costate'
+import createCostate, { watch } from 'costate'
 
 // costate is reactive
-const costate = co({ a: 1 })
+const costate = createCostate({ a: 1 })
 
 // state is immutable
 watch(costate, state => {
@@ -67,7 +67,7 @@ Think about **costate** + **react-hooks**!
 
 ```javascript
 import * as React from 'react'
-import co, { useCostate } from 'costate'
+import { co, useCostate } from 'costate'
 
 function Counter() {
   // useCostate instead of React.useState
@@ -239,7 +239,7 @@ function Footer({ todos }) {
 
 ## Caveat
 
-- `co(state)` only accept object or array as arguemnt
+- `createCostate(state)` only accept object or array as arguemnt
 
 ## Author
 
