@@ -1,5 +1,14 @@
 import 'jest'
-import { createCostate, watch, getState, remove, hasCostate, isCostate } from '../src'
+import {
+  createCostate,
+  co,
+  getState,
+  getCostate,
+  hasCostate,
+  isCostate,
+  watch,
+  remove
+} from '../src'
 
 const delay = (timeout = 0) => new Promise(resolve => setTimeout(resolve, timeout))
 
@@ -30,9 +39,13 @@ describe('createCostate', () => {
     provider()
   })
 
-  it('should throw error when watch target is not a costate', () => {
+  it('should throw error when watch target is not a costate or watcher is not a functionh', () => {
     expect(() => {
       watch({} as any, () => {})
+    }).toThrow()
+
+    expect(() => {
+      watch(createCostate({}), 1 as any)
     }).toThrow()
   })
 
@@ -116,6 +129,21 @@ describe('createCostate', () => {
     delete costate.b
 
     expect(costate.hasOwnProperty('b')).toBe(false)
+  })
+
+  it('can detect add object property', done => {
+    let costate = createCostate<{ a: number; b: number; c?: number }>({ a: 1, b: 2 })
+
+    watch(costate, state => {
+      expect(state.hasOwnProperty('c')).toBe(true)
+      done()
+    })
+
+    expect(costate.hasOwnProperty('c')).toBe(false)
+
+    costate.c = 1
+
+    expect(costate.hasOwnProperty('c')).toBe(true)
   })
 
   it('should disconnect array item correctly', done => {
@@ -210,17 +238,46 @@ describe('createCostate', () => {
     }
   })
 
-  it('can be getState and detect', () => {
+  it('can be detected and retrived', () => {
     let costate = createCostate({ count: 0 })
     let state = getState(costate)
 
-    expect(isCostate(costate)).toBe(true)
     expect(isCostate({ count: 0 })).toBe(false)
+    expect(isCostate(state)).toBe(false)
+    expect(isCostate(costate)).toBe(true)
 
     expect(hasCostate(state)).toBe(true)
+    expect(hasCostate(costate)).toBe(false)
     expect(hasCostate({ count: 0 })).toBe(false)
 
+    expect(costate === getCostate(state)).toBe(true)
+    expect(state === getState(costate)).toBe(true)
+
     expect(state).toEqual({ count: 0 })
+  })
+
+  it('co works correctly', () => {
+    let costate = createCostate({ a: 1 })
+
+    expect(co(costate)).toEqual({ a: 1 })
+    expect(co(co(costate)) === costate).toBe(true)
+    expect(co(costate) === co(costate)).toBe(true)
+
+    expect(() => {
+      co(1 as any)
+    }).toThrow()
+  })
+
+  it('should throw error when getState call on non-costate value', () => {
+    expect(() => {
+      getState({})
+    }).toThrow()
+  })
+
+  it('should throw error when getCostate call on object which is not derived by costate', () => {
+    expect(() => {
+      getCostate({})
+    }).toThrow()
   })
 
   it('object state derived by costate should be immutable', () => {
@@ -411,5 +468,11 @@ describe('createCostate', () => {
 
     expect(list0).toEqual([{ value: 1 }, { value: 2 }, { value: 3 }, { value: 4 }])
     expect(list1).toEqual([{ value: 2 }, { value: 3 }])
+  })
+
+  it('should throw error when remove target is not a costate', () => {
+    expect(() => {
+      remove(1 as any)
+    }).toThrow()
   })
 })
