@@ -3,8 +3,8 @@
 ## Basic API
 
 ```javascript
-import createCostate, { co, read, watch, isCostate, hasCostate, remove } from 'costate'
-import { useCostate, useCoreducer } from 'costate'
+import { createCostate, co, getState, getCostate, watch, isCostate, hasCostate, remove } from 'costate'
+import { useCostate, useCoreducer } from 'costate/react'
 ```
 
 ### createCostate(state) => costate
