@@ -7,7 +7,9 @@ type GetInitialState<T> = () => T
 
 type InitialState<T> = GetInitialState<T> | T
 
-export default function useCostate<T extends Source = any>(initialState: InitialState<T>): T {
+export default function useCostate<T extends Source>(getInitialState: GetInitialState<T>): T
+export default function useCostate<T extends Source>(rawInitialState: T): T
+export default function useCostate<T extends Source>(initialState: InitialState<T>): T {
   let costate = useMemo(
     () =>
       createCostate(
